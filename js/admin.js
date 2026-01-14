@@ -149,15 +149,26 @@ btnImport.addEventListener('click', async () => {
     }
   });
 
+  const idRe = (typeof ID_RE !== 'undefined') ? ID_RE : /^[0-9A-Za-z_-]+$/;
+  let invalidIdCount = 0;
   const groupsMap = new Map();
   for (const r of recs) {
     if (!r.gi || !r.mi || !r.name) continue;
     if (!groupsMap.has(r.gi)) groupsMap.set(r.gi, { title: r.gt || '', members: [] });
     const g = groupsMap.get(r.gi);
     g.title = r.gt || '';
-    g.members.push({ _mi: r.mi, name: r.name, ext: r.ext || '', mobile: r.mobile || '', email: r.email || '', workHours: r.workHours || '', id: r.id || undefined });
+    let memberId = r.id || '';
+    if (memberId && !idRe.test(memberId)) {
+      invalidIdCount += 1;
+      memberId = '';
+    }
+    r.id = memberId;
+    g.members.push({ _mi: r.mi, name: r.name, ext: r.ext || '', mobile: r.mobile || '', email: r.email || '', workHours: r.workHours || '', id: memberId || undefined });
   }
   const groups = Array.from(groupsMap.entries()).sort((a, b) => a[0] - b[0]).map(([gi, g]) => { g.members.sort((a, b) => (a._mi || 0) - (b._mi || 0)); g.members.forEach(m => delete m._mi); return g; });
+  if (invalidIdCount > 0) {
+    toast(`不正なIDが${invalidIdCount}件あり、自動生成IDに置換しました`, false);
+  }
   const cfgToSet = { version: 2, updated: Date.now(), groups, menus: MENUS || undefined };
   const r1 = await adminSetConfigFor(office, cfgToSet);
   if (!r1 || r1.error) {
