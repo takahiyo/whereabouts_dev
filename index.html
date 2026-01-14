@@ -1,43 +1,46 @@
 <!doctype html>
 <html lang="ja">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>在席確認表</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>在席確認表</title>
 
-<!-- 強めのキャッシュ抑止（HTMLに効く） -->
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
+  <!-- 強めのキャッシュ抑止（HTMLに効く） -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
-<!-- CSP：Worker への POST を許可 -->
-<meta http-equiv="Content-Security-Policy"
-      content="default-src 'self';
-               script-src 'self';
-               connect-src 'self' https://presence-proxy-prod.taka-hiyo.workers.dev;
+  <!-- CSP：Worker への POST を許可 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+               script-src 'self' https://www.gstatic.com;
+               connect-src 'self' https://presence-proxy-test.taka-hiyo.workers.dev https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com;
                style-src 'self' 'unsafe-inline';
                img-src 'self' data:;
                font-src 'self';
                object-src 'none';
                base-uri 'self';
                form-action 'self'">
-<link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css">
 
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
+
 <body>
-<header>
+  <header>
     <div class="title-wrap">
-      <button id="titleBtn" class="title-btn" aria-haspopup="true" aria-expanded="false" aria-controls="groupMenu">在席確認表</button>
+      <button id="titleBtn" class="title-btn" aria-haspopup="true" aria-expanded="false"
+        aria-controls="groupMenu">在席確認表</button>
       <div id="groupMenu" class="grp-menu" role="menu" aria-labelledby="titleBtn">
         <h4 id="groupMenuTitle">グループにジャンプ</h4>
         <ul id="groupMenuList"></ul>
       </div>
     </div>
-<button id="adminBtn" class="admin-btn" title="管理">管理</button>
-    <input id="nameFilter" class="name-filter" type="search" placeholder="氏名検索（入力と同時に絞り込み）" aria-label="氏名検索" autocomplete="off" name="member_search_query" />
+    <button id="adminBtn" class="admin-btn" title="管理">管理</button>
+    <input id="nameFilter" class="name-filter" type="search" placeholder="氏名検索（入力と同時に絞り込み）" aria-label="氏名検索"
+      autocomplete="off" name="member_search_query" />
     <select id="statusFilter" class="status-filter" aria-label="ステータスで絞り込み"></select>
     <button id="noticesBtn" class="notices-btn" title="お知らせ">お知らせ</button>
     <button id="eventBtn" class="event-btn" title="イベント">📅 イベント</button>
@@ -68,44 +71,46 @@
 
       <div class="admin-card-body">
 
-      <!-- タブパネル1: 基本設定 -->
-      <div id="tabBasic" class="tab-panel active" data-tab="basic">
-        <div class="admin-grid">
-          <div class="admin-box admin-box-stacked">
-            <h4>📁 CSV管理</h4>
-            <div class="admin-subsection">
-              <h5>📥 在席確認表リスト エクスポート</h5>
-              <div class="admin-row"><button id="btnExport">ダウンロード</button></div>
-              <div class="admin-note">形式：グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</div>
-              <div class="admin-note" style="font-size:11px;color:#6b7280;">※従来フォーマット（携帯番号・Email列なし）も引き続き対応</div>
+        <!-- タブパネル1: 基本設定 -->
+        <div id="tabBasic" class="tab-panel active" data-tab="basic">
+          <div class="admin-grid">
+            <div class="admin-box admin-box-stacked">
+              <h4>📁 CSV管理</h4>
+              <div class="admin-subsection">
+                <h5>📥 在席確認表リスト エクスポート</h5>
+                <div class="admin-row"><button id="btnExport">ダウンロード</button></div>
+                <div class="admin-note">形式：グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</div>
+                <div class="admin-note" style="font-size:11px;color:#6b7280;">※従来フォーマット（携帯番号・Email列なし）も引き続き対応</div>
+              </div>
+              <div class="admin-subsection">
+                <h5>📤 在席確認表リスト インポート</h5>
+                <div class="admin-row"><input type="file" id="csvFile" accept=".csv,text/csv" /><button
+                    id="btnImport">取り込み</button></div>
+              </div>
             </div>
-            <div class="admin-subsection">
-              <h5>📤 在席確認表リスト インポート</h5>
-              <div class="admin-row"><input type="file" id="csvFile" accept=".csv,text/csv" /><button id="btnImport">取り込み</button></div>
-            </div>
-          </div>
 
-          <div class="admin-box admin-box-stacked">
-            <h4>🏢 拠点設定</h4>
-            <div class="admin-subsection">
-              <h5>拠点名の変更</h5>
-              <div class="admin-row"><input id="renameOfficeName" placeholder="新しい拠点名" /><button id="btnRenameOffice">変更</button></div>
-            </div>
-            <div class="admin-subsection">
-              <h5>拠点パスワードの変更</h5>
-              <div class="admin-row">
-                <input id="setPw" placeholder="新パスワード（任意）" />
-                <input id="setAdminPw" placeholder="新管理者PW（任意）" />
-                <button id="btnSetPw">更新</button>
+            <div class="admin-box admin-box-stacked">
+              <h4>🏢 拠点設定</h4>
+              <div class="admin-subsection">
+                <h5>拠点名の変更</h5>
+                <div class="admin-row"><input id="renameOfficeName" placeholder="新しい拠点名" /><button
+                    id="btnRenameOffice">変更</button></div>
+              </div>
+              <div class="admin-subsection">
+                <h5>拠点パスワードの変更</h5>
+                <div class="admin-row">
+                  <input id="setPw" placeholder="新パスワード（任意）" />
+                  <input id="setAdminPw" placeholder="新管理者PW（任意）" />
+                  <button id="btnSetPw">更新</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- タブパネル: メンバー管理 -->
-      <div id="tabMembers" class="tab-panel" data-tab="members">
-        <div class="members-panel">
+        <!-- タブパネル: メンバー管理 -->
+        <div id="tabMembers" class="tab-panel" data-tab="members">
+          <div class="members-panel">
             <div class="admin-box">
               <div class="admin-box-header">
                 <h4>👥 メンバー一覧・編集</h4>
@@ -155,154 +160,176 @@
               <div class="member-table-wrap">
                 <table class="member-table">
                   <thead>
-                    <tr><th style="width:64px;">順番</th><th>グループ</th><th>氏名</th><th>内線</th><th>携帯</th><th>Email</th><th style="width:160px;">操作</th></tr>
+                    <tr>
+                      <th style="width:64px;">順番</th>
+                      <th>グループ</th>
+                      <th>氏名</th>
+                      <th>内線</th>
+                      <th>携帯</th>
+                      <th>Email</th>
+                      <th style="width:160px;">操作</th>
+                    </tr>
                   </thead>
-                <tbody id="memberTableBody">
-                  <tr><td colspan="7" style="text-align:center;color:#6b7280;">読み込み待ち</td></tr>
-                </tbody>
-              </table>
+                  <tbody id="memberTableBody">
+                    <tr>
+                      <td colspan="7" style="text-align:center;color:#6b7280;">読み込み待ち</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- タブパネル2: お知らせ管理 -->
-      <div id="tabNotices" class="tab-panel" data-tab="notices">
-        <div class="notices-manager">
-          <div class="notices-manager-toolbar">
-            <div class="notices-manager-info">
-              <p>お知らせの順番はドラッグ&ドロップまたは↑↓ボタンで入れ替えられます。上にあるものから順に表示されます。</p>
-              <p>「表示する」チェックで公開/非公開を切り替えられます。削除ボタンを押すと確認ダイアログが表示されます。</p>
+        <!-- タブパネル2: お知らせ管理 -->
+        <div id="tabNotices" class="tab-panel" data-tab="notices">
+          <div class="notices-manager">
+            <div class="notices-manager-toolbar">
+              <div class="notices-manager-info">
+                <p>お知らせの順番はドラッグ&ドロップまたは↑↓ボタンで入れ替えられます。上にあるものから順に表示されます。</p>
+                <p>「表示する」チェックで公開/非公開を切り替えられます。削除ボタンを押すと確認ダイアログが表示されます。</p>
+              </div>
+              <div class="notices-manager-actions">
+                <button id="btnAddNotice" class="btn-primary">➕ お知らせを追加</button>
+                <button id="btnLoadNotices" class="btn-secondary">🔄 読み込み</button>
+                <button id="btnSaveNotices" class="btn-success">💾 保存</button>
+              </div>
             </div>
-            <div class="notices-manager-actions">
-              <button id="btnAddNotice" class="btn-primary">➕ お知らせを追加</button>
-              <button id="btnLoadNotices" class="btn-secondary">🔄 読み込み</button>
-              <button id="btnSaveNotices" class="btn-success">💾 保存</button>
-            </div>
-          </div>
 
-          <div class="notices-manager-scroll">
-            <div id="noticesEditor" class="notices-editor"></div>
+            <div class="notices-manager-scroll">
+              <div id="noticesEditor" class="notices-editor"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- タブパネル3: イベント管理 -->
-      <div id="tabEvents" class="tab-panel" data-tab="events">
-        <div class="vacation-grid">
-          <div class="admin-box">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <h4 style="margin:0;">登録済みのイベント</h4>
-              <button id="btnExportEvent" class="btn-secondary" style="font-size:13px;">📄 イベントをエクスポート</button>
-            </div>
-            <div class="vacation-table-wrap">
+        <!-- タブパネル3: イベント管理 -->
+        <div id="tabEvents" class="tab-panel" data-tab="events">
+          <div class="vacation-grid">
+            <div class="admin-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <h4 style="margin:0;">登録済みのイベント</h4>
+                <button id="btnExportEvent" class="btn-secondary" style="font-size:13px;">📄 イベントをエクスポート</button>
+              </div>
+              <div class="vacation-table-wrap">
                 <table class="vacation-table">
                   <thead>
-                    <tr><th style="width:44px;">並び</th><th>タイトル</th><th>期間</th><th>対象拠点</th><th>休暇固定（種別）</th><th>色</th><th>備考</th><th>表示</th><th>操作</th></tr>
+                    <tr>
+                      <th style="width:44px;">並び</th>
+                      <th>タイトル</th>
+                      <th>期間</th>
+                      <th>対象拠点</th>
+                      <th>休暇固定（種別）</th>
+                      <th>色</th>
+                      <th>備考</th>
+                      <th>表示</th>
+                      <th>操作</th>
+                    </tr>
                   </thead>
                   <tbody id="vacationListBody">
-                    <tr><td colspan="9" style="text-align:center;color:#6b7280;">読み込み待ち</td></tr>
+                    <tr>
+                      <td colspan="9" style="text-align:center;color:#6b7280;">読み込み待ち</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-          <div class="admin-box">
-            <h4>イベントの作成 / 更新</h4>
-            <div class="vacation-form">
-              <div class="vacation-row">
-                <label>対象拠点
-                  <select id="vacationOffice" aria-label="対象拠点"></select>
-                </label>
-              </div>
-              <div class="vacation-row">
-                <label>タイトル
-                  <input id="vacationTitle" type="text" placeholder="例: GW期間休暇" />
-                </label>
-              </div>
-              <div class="vacation-row vacation-row-two-cols">
-                <label>開始日
-                  <input id="vacationStart" type="date" />
-                </label>
-                <label>終了日
-                  <input id="vacationEnd" type="date" />
-                </label>
-              </div>
-              <div class="vacation-row vacation-row-inline">
-                <label>お知らせを選択
-                  <select id="vacationNotice" aria-label="イベントに紐づけるお知らせ"></select>
-                </label>
-                <div class="vacation-inline-actions">
-                  <button id="btnCreateNoticeFromEvent" class="btn-secondary">➕ お知らせ新規作成</button>
+            <div class="admin-box">
+              <h4>イベントの作成 / 更新</h4>
+              <div class="vacation-form">
+                <div class="vacation-row">
+                  <label>対象拠点
+                    <select id="vacationOffice" aria-label="対象拠点"></select>
+                  </label>
                 </div>
-              </div>
-              <div class="vacation-row vacation-row-two-cols">
-                <label>
-                  種別
-                  <input id="vacationTypeText" type="text" value="休暇固定（一覧で切替）" readonly />
-                  <span class="vacation-helper">※ 種別は一覧の「休暇固定」列で変更できます。</span>
-                </label>
-                <label>色/カテゴリー
-                  <select id="vacationColor" aria-label="色/カテゴリー">
-                    <option value="amber">サニー</option>
-                    <option value="blue">ブルー</option>
-                    <option value="green">グリーン</option>
-                    <option value="pink">ピンク</option>
-                    <option value="purple">パープル</option>
-                    <option value="teal">ティール</option>
-                    <option value="gray">グレー</option>
-                  </select>
-                </label>
-              </div>
-              <div class="vacation-row" style="display:none;">
-                <label>メンバーの休暇指定（ガントで自動入力）
-                  <input id="vacationMembersBits" type="text" placeholder="ガント入力で自動反映されます" readonly />
-                  <span class="vacation-helper">※ 手入力は不要です。下のガント表で休暇にしたいメンバーと日付をONにしてください。</span>
-                </label>
-              </div>
-              <div class="vacation-actions">
-                <button id="btnVacationSave" class="btn-primary">💾 作成/更新</button>
-                <button id="btnVacationDelete" class="btn-danger">🗑️ 削除</button>
-                <button id="btnVacationClear" class="btn-secondary">🧹 入力クリア</button>
-                <button id="btnVacationReload" class="btn-secondary">🔄 一覧更新</button>
-              </div>
-              <div class="vacation-row" style="display:none;">
-                <div class="vacation-gantt-head">
-                  <div class="vacation-gantt-title">ガント入力</div>
-                  <div class="vacation-gantt-help">開始日/終了日に合わせて日付スロットを生成し、セルをクリック/ドラッグ（スマホはタップ）するとビットが切り替わります。</div>
+                <div class="vacation-row">
+                  <label>タイトル
+                    <input id="vacationTitle" type="text" placeholder="例: GW期間休暇" />
+                  </label>
                 </div>
-                <div id="vacationGantt" class="vacation-gantt" aria-live="polite"></div>
-              </div>
-              <div class="vacation-row" style="display:none;">
-                <label>ID（自動設定）
-                  <input id="vacationId" type="text" readonly placeholder="新規作成時は空欄のまま" />
-                </label>
+                <div class="vacation-row vacation-row-two-cols">
+                  <label>開始日
+                    <input id="vacationStart" type="date" />
+                  </label>
+                  <label>終了日
+                    <input id="vacationEnd" type="date" />
+                  </label>
+                </div>
+                <div class="vacation-row vacation-row-inline">
+                  <label>お知らせを選択
+                    <select id="vacationNotice" aria-label="イベントに紐づけるお知らせ"></select>
+                  </label>
+                  <div class="vacation-inline-actions">
+                    <button id="btnCreateNoticeFromEvent" class="btn-secondary">➕ お知らせ新規作成</button>
+                  </div>
+                </div>
+                <div class="vacation-row vacation-row-two-cols">
+                  <label>
+                    種別
+                    <input id="vacationTypeText" type="text" value="休暇固定（一覧で切替）" readonly />
+                    <span class="vacation-helper">※ 種別は一覧の「休暇固定」列で変更できます。</span>
+                  </label>
+                  <label>色/カテゴリー
+                    <select id="vacationColor" aria-label="色/カテゴリー">
+                      <option value="amber">サニー</option>
+                      <option value="blue">ブルー</option>
+                      <option value="green">グリーン</option>
+                      <option value="pink">ピンク</option>
+                      <option value="purple">パープル</option>
+                      <option value="teal">ティール</option>
+                      <option value="gray">グレー</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="vacation-row" style="display:none;">
+                  <label>メンバーの休暇指定（ガントで自動入力）
+                    <input id="vacationMembersBits" type="text" placeholder="ガント入力で自動反映されます" readonly />
+                    <span class="vacation-helper">※ 手入力は不要です。下のガント表で休暇にしたいメンバーと日付をONにしてください。</span>
+                  </label>
+                </div>
+                <div class="vacation-actions">
+                  <button id="btnVacationSave" class="btn-primary">💾 作成/更新</button>
+                  <button id="btnVacationDelete" class="btn-danger">🗑️ 削除</button>
+                  <button id="btnVacationClear" class="btn-secondary">🧹 入力クリア</button>
+                  <button id="btnVacationReload" class="btn-secondary">🔄 一覧更新</button>
+                </div>
+                <div class="vacation-row" style="display:none;">
+                  <div class="vacation-gantt-head">
+                    <div class="vacation-gantt-title">ガント入力</div>
+                    <div class="vacation-gantt-help">開始日/終了日に合わせて日付スロットを生成し、セルをクリック/ドラッグ（スマホはタップ）するとビットが切り替わります。</div>
+                  </div>
+                  <div id="vacationGantt" class="vacation-gantt" aria-live="polite"></div>
+                </div>
+                <div class="vacation-row" style="display:none;">
+                  <label>ID（自動設定）
+                    <input id="vacationId" type="text" readonly placeholder="新規作成時は空欄のまま" />
+                  </label>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- タブパネル4: ツール管理 -->
-      <div id="tabTools" class="tab-panel" data-tab="tools">
-        <div class="tools-manager">
-          <div class="tools-manager-toolbar">
-            <div class="tools-manager-info">
-              <p>ツールの順番はドラッグ&ドロップまたは↑↓ボタンで入れ替えられます。上にあるものから順に表示されます。</p>
-              <p>タイトルとURL、備考を入力できます。表示をOFFにしたツールは利用者画面に表示されません。</p>
+        <!-- タブパネル4: ツール管理 -->
+        <div id="tabTools" class="tab-panel" data-tab="tools">
+          <div class="tools-manager">
+            <div class="tools-manager-toolbar">
+              <div class="tools-manager-info">
+                <p>ツールの順番はドラッグ&ドロップまたは↑↓ボタンで入れ替えられます。上にあるものから順に表示されます。</p>
+                <p>タイトルとURL、備考を入力できます。表示をOFFにしたツールは利用者画面に表示されません。</p>
+              </div>
+              <div class="tools-manager-actions">
+                <button id="btnAddTool" class="btn-primary">➕ ツールを追加</button>
+                <button id="btnLoadTools" class="btn-secondary">🔄 読み込み</button>
+                <button id="btnSaveTools" class="btn-success">💾 保存</button>
+              </div>
             </div>
-            <div class="tools-manager-actions">
-              <button id="btnAddTool" class="btn-primary">➕ ツールを追加</button>
-              <button id="btnLoadTools" class="btn-secondary">🔄 読み込み</button>
-              <button id="btnSaveTools" class="btn-success">💾 保存</button>
-            </div>
-          </div>
 
-          <div class="tools-manager-scroll">
-            <div id="toolsEditor" class="tools-editor"></div>
+            <div class="tools-manager-scroll">
+              <div id="toolsEditor" class="tools-editor"></div>
+            </div>
           </div>
         </div>
-      </div>
 
       </div>
     </div>
@@ -324,19 +351,21 @@
               <span>イベントを選択:</span>
               <select id="eventSelectDropdown" class="event-select-dropdown"></select>
             </label>
-            <button id="btnShowEventNotice" class="btn-secondary btn-show-event-notice" style="display:none;">📄 イベントの内容を表示</button>
+            <button id="btnShowEventNotice" class="btn-secondary btn-show-event-notice" style="display:none;">📄
+              イベントの内容を表示</button>
           </div>
           <div id="vacationRadioList" class="vacation-radio-list" style="display:none;"></div>
           <div id="eventGanttWrap" class="vacation-gantt-head">
             <div class="vacation-gantt-sticky-header">
-                <div class="event-toolbar">
-                  <div class="event-toolbar__hint">
-                    <span class="vacation-gantt-touch-hint">セルをクリック/ドラッグ（スマホはタップ）するとON/OFFを切り替えられます。</span>
-                    <span id="eventColorManualHint" class="event-color-manual-hint" role="status" aria-live="polite" style="display:none;"></span>
-                  </div>
-                  <div class="vacation-actions" style="margin-bottom:0;display:flex;gap:8px;justify-content:flex-end;">
-                    <button id="btnEventPrint" class="btn-secondary">🖨️ 印刷</button>
-                  </div>
+              <div class="event-toolbar">
+                <div class="event-toolbar__hint">
+                  <span class="vacation-gantt-touch-hint">セルをクリック/ドラッグ（スマホはタップ）するとON/OFFを切り替えられます。</span>
+                  <span id="eventColorManualHint" class="event-color-manual-hint" role="status" aria-live="polite"
+                    style="display:none;"></span>
+                </div>
+                <div class="vacation-actions" style="margin-bottom:0;display:flex;gap:8px;justify-content:flex-end;">
+                  <button id="btnEventPrint" class="btn-secondary">🖨️ 印刷</button>
+                </div>
               </div>
               <div id="eventGroupJumps" class="vacation-group-jumps" aria-label="グループジャンプ" style="display:none;">
                 <span class="jump-label">グループ移動</span>
@@ -361,7 +390,8 @@
   </div>
 
   <!-- お知らせプレビューモーダル（イベント経由専用） -->
-  <div id="noticeModal" class="admin-modal notice-modal" aria-modal="true" role="dialog" aria-labelledby="noticeModalTitle" aria-hidden="true">
+  <div id="noticeModal" class="admin-modal notice-modal" aria-modal="true" role="dialog"
+    aria-labelledby="noticeModalTitle" aria-hidden="true">
     <div class="admin-card notice-modal-card">
       <div class="notice-modal-header">
         <h3 id="noticeModalTitle">関連お知らせ</h3>
@@ -372,7 +402,8 @@
   </div>
 
   <!-- ツールモーダル -->
-  <div id="toolsModal" class="admin-modal tools-modal" aria-modal="true" role="dialog" aria-labelledby="toolsModalTitle">
+  <div id="toolsModal" class="admin-modal tools-modal" aria-modal="true" role="dialog"
+    aria-labelledby="toolsModalTitle">
     <div class="admin-card tools-modal-card">
       <div class="tools-modal-header">
         <h3 id="toolsModalTitle">🛠️ ツール一覧</h3>
@@ -400,7 +431,7 @@
 
       <section id="manualUser" class="manual-section manual-tab-content active">
         <h4>📖 ユーザーマニュアル - 初めての方へ</h4>
-        
+
         <div style="background:#f0f8ff;padding:12px;margin:12px 0;border-left:4px solid #0073bb;border-radius:4px;">
           <strong>💡 このシステムについて</strong><br>
           在席確認表は、チームメンバーの在席状況をリアルタイムで共有するシステムです。<br>
@@ -441,7 +472,7 @@
         </ul>
 
         <h5>✍️ 3. 基本操作 - 自分の状態を更新する</h5>
-        
+
         <p style="margin:8px 0;"><strong>📝 業務時間の入力</strong></p>
         <ol style="line-height:1.8;">
           <li>自分の行の「業務時間」欄をクリック</li>
@@ -451,16 +482,66 @@
 
         <p style="margin:16px 0 8px 0;"><strong>🎨 ステータスの選択（色分けされます）</strong></p>
         <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:0.9em;">
-          <tr style="background:#f5f5f5;"><th style="padding:6px;border:1px solid #ddd;">ステータス</th><th style="padding:6px;border:1px solid #ddd;">色</th><th style="padding:6px;border:1px solid #ddd;">戻り時間</th><th style="padding:6px;border:1px solid #ddd;">使用例</th></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">在席</td><td style="padding:6px;border:1px solid #ddd;">無色（白）</td><td style="padding:6px;border:1px solid #ddd;">不要</td><td style="padding:6px;border:1px solid #ddd;">デスクにいるとき</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">外出</td><td style="padding:6px;border:1px solid #ddd;">🟠 オレンジ</td><td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td><td style="padding:6px;border:1px solid #ddd;">銀行、郵便局など</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">在宅勤務</td><td style="padding:6px;border:1px solid #ddd;">🟣 紫</td><td style="padding:6px;border:1px solid #ddd;">不要</td><td style="padding:6px;border:1px solid #ddd;">テレワーク中</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">出張</td><td style="padding:6px;border:1px solid #ddd;">🔵 水色</td><td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td><td style="padding:6px;border:1px solid #ddd;">他拠点や客先へ</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">研修</td><td style="padding:6px;border:1px solid #ddd;">🟢 緑</td><td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td><td style="padding:6px;border:1px solid #ddd;">研修・セミナー参加</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">健康診断</td><td style="padding:6px;border:1px solid #ddd;">🩷 ピンク</td><td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td><td style="padding:6px;border:1px solid #ddd;">健康診断受診中</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">コアドック</td><td style="padding:6px;border:1px solid #ddd;">💜 薄紫</td><td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td><td style="padding:6px;border:1px solid #ddd;">コアドック受診中</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">帰宅</td><td style="padding:6px;border:1px solid #ddd;">⚪ 灰色</td><td style="padding:6px;border:1px solid #ddd;">不要</td><td style="padding:6px;border:1px solid #ddd;">退社済み</td></tr>
-          <tr><td style="padding:6px;border:1px solid #ddd;">休み</td><td style="padding:6px;border:1px solid #ddd;">🔴 赤</td><td style="padding:6px;border:1px solid #ddd;">不要</td><td style="padding:6px;border:1px solid #ddd;">休暇・欠勤</td></tr>
+          <tr style="background:#f5f5f5;">
+            <th style="padding:6px;border:1px solid #ddd;">ステータス</th>
+            <th style="padding:6px;border:1px solid #ddd;">色</th>
+            <th style="padding:6px;border:1px solid #ddd;">戻り時間</th>
+            <th style="padding:6px;border:1px solid #ddd;">使用例</th>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">在席</td>
+            <td style="padding:6px;border:1px solid #ddd;">無色（白）</td>
+            <td style="padding:6px;border:1px solid #ddd;">不要</td>
+            <td style="padding:6px;border:1px solid #ddd;">デスクにいるとき</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">外出</td>
+            <td style="padding:6px;border:1px solid #ddd;">🟠 オレンジ</td>
+            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
+            <td style="padding:6px;border:1px solid #ddd;">銀行、郵便局など</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">在宅勤務</td>
+            <td style="padding:6px;border:1px solid #ddd;">🟣 紫</td>
+            <td style="padding:6px;border:1px solid #ddd;">不要</td>
+            <td style="padding:6px;border:1px solid #ddd;">テレワーク中</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">出張</td>
+            <td style="padding:6px;border:1px solid #ddd;">🔵 水色</td>
+            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
+            <td style="padding:6px;border:1px solid #ddd;">他拠点や客先へ</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">研修</td>
+            <td style="padding:6px;border:1px solid #ddd;">🟢 緑</td>
+            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
+            <td style="padding:6px;border:1px solid #ddd;">研修・セミナー参加</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">健康診断</td>
+            <td style="padding:6px;border:1px solid #ddd;">🩷 ピンク</td>
+            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
+            <td style="padding:6px;border:1px solid #ddd;">健康診断受診中</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">コアドック</td>
+            <td style="padding:6px;border:1px solid #ddd;">💜 薄紫</td>
+            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
+            <td style="padding:6px;border:1px solid #ddd;">コアドック受診中</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">帰宅</td>
+            <td style="padding:6px;border:1px solid #ddd;">⚪ 灰色</td>
+            <td style="padding:6px;border:1px solid #ddd;">不要</td>
+            <td style="padding:6px;border:1px solid #ddd;">退社済み</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;border:1px solid #ddd;">休み</td>
+            <td style="padding:6px;border:1px solid #ddd;">🔴 赤</td>
+            <td style="padding:6px;border:1px solid #ddd;">不要</td>
+            <td style="padding:6px;border:1px solid #ddd;">休暇・欠勤</td>
+          </tr>
         </table>
 
         <p style="margin:16px 0 8px 0;"><strong>⏰ 戻り時間の入力（外出、出張、研修などの場合）</strong></p>
@@ -519,8 +600,9 @@
           </ul>
         </div>
 
-        <h5>🔍 5. 他の人の状況を確認する</h5></h5>
-        
+        <h5>🔍 5. 他の人の状況を確認する</h5>
+        </h5>
+
         <p><strong>氏名検索の使い方</strong></p>
         <ol style="line-height:1.8;">
           <li>画面上部の検索ボックスに名前を入力（例：「田中」）</li>
@@ -554,7 +636,8 @@
         <ol style="line-height:1.8;">
           <li><strong>初期状態（ログイン直後）</strong>：お知らせは<strong>展開</strong>された状態で表示されます</li>
           <li><strong>折りたたみ</strong>：ヘッダーの「お知らせ」ボタンをクリック → 最初のお知らせのタイトルと件数のみ表示されます<br>
-            <span style="color:#666;font-size:0.9em;">例：「システムメンテナンスのお知らせ (他2件)」</span></li>
+            <span style="color:#666;font-size:0.9em;">例：「システムメンテナンスのお知らせ (他2件)」</span>
+          </li>
           <li><strong>展開</strong>：もう一度「お知らせ」ボタンをクリック → すべてのお知らせが表示されます</li>
         </ol>
 
@@ -583,7 +666,8 @@
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. お知らせボタンが表示されません</summary>
-          <p style="margin:8px 0 8px 20px;">A. お知らせがない場合、お知らせボタンとお知らせエリアは表示されません。管理者がお知らせを登録すると自動的に表示されます（約30秒以内に反映）。</p>
+          <p style="margin:8px 0 8px 20px;">A. お知らせがない場合、お知らせボタンとお知らせエリアは表示されません。管理者がお知らせを登録すると自動的に表示されます（約30秒以内に反映）。
+          </p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. お知らせが邪魔で画面が見づらい</summary>
@@ -627,7 +711,7 @@
           <li><strong>「保存」ボタン</strong>をクリック</li>
           <li>✅ 選択した日のステータスが自動的に「休み」（または「休暇」「有給」など）になり、備考欄に休暇タイトルが表示されます</li>
         </ol>
-        
+
         <div style="background:#fff3cd;padding:10px;margin:10px 0;border-left:3px solid #ffc107;border-radius:3px;">
           <strong>💡 操作のコツ</strong>
           <ul style="margin:6px 0;line-height:1.6;">
@@ -681,7 +765,8 @@
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇（イベント）を新規作成したい</summary>
-          <p style="margin:8px 0 8px 20px;">A. 長期休暇の登録・編集・削除は<strong>管理者のみ</strong>が行えます。夏季休暇、年末年始、GWなどのイベントを設定したい場合は、管理者に問い合わせてください。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            長期休暇の登録・編集・削除は<strong>管理者のみ</strong>が行えます。夏季休暇、年末年始、GWなどのイベントを設定したい場合は、管理者に問い合わせてください。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇で選択した日を変更したい</summary>
@@ -693,30 +778,36 @@
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇の選択を解除したい（通常のステータスに戻したい）</summary>
-          <p style="margin:8px 0 8px 20px;">A. 長期休暇カレンダーを開き、青色になっているセルをクリックして解除し、「保存」ボタンをクリックしてください。または、長期休暇カレンダー上部の「表示クリア」ボタンをクリックすると、全ての選択が解除されます。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            長期休暇カレンダーを開き、青色になっているセルをクリックして解除し、「保存」ボタンをクリックしてください。または、長期休暇カレンダー上部の「表示クリア」ボタンをクリックすると、全ての選択が解除されます。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇を保存したのに反映されない</summary>
-          <p style="margin:8px 0 8px 20px;">A. ブラウザの画面を更新（F5キー）してください。保存された休暇は自動的に適用されるはずですが、反映されない場合は再度長期休暇カレンダーを開いて「表示」ボタンをクリックしてください。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            ブラウザの画面を更新（F5キー）してください。保存された休暇は自動的に適用されるはずですが、反映されない場合は再度長期休暇カレンダーを開いて「表示」ボタンをクリックしてください。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 複数のイベントを同時に選択できますか？</summary>
-          <p style="margin:8px 0 8px 20px;">A. いいえ、<strong>1つのイベントしか選択できません</strong>。別のイベントを選択すると、前のイベントで選択した内容は上書きされます。複数のイベント期間にまたがる休暇を取る場合は、それぞれのイベントで個別に選択してください。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            いいえ、<strong>1つのイベントしか選択できません</strong>。別のイベントを選択すると、前のイベントで選択した内容は上書きされます。複数のイベント期間にまたがる休暇を取る場合は、それぞれのイベントで個別に選択してください。
+          </p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 日付が縦に表示されて読みにくい</summary>
-          <p style="margin:8px 0 8px 20px;">A. スマートフォンなど狭い画面では、日付が縦3行表示（「12月 / 9日 / 月」）になります。これは限られたスペースに多くの情報を表示するための仕様です。PCやタブレットでは横並び表示になります。</p>
+          <p style="margin:8px 0 8px 20px;">A. スマートフォンなど狭い画面では、日付が縦3行表示（「12月 / 9日 /
+            月」）になります。これは限られたスペースに多くの情報を表示するための仕様です。PCやタブレットでは横並び表示になります。</p>
         </details>
 
         <p style="margin-top:16px;font-size:0.95em;">
           <strong>📚 さらに詳しく知りたい方へ</strong><br>
-          より詳細な情報は <a href="USER_MANUAL.md" target="_blank" style="color:#0073bb;text-decoration:underline;">詳細マニュアル（USER_MANUAL.md）</a> をご覧ください。
+          より詳細な情報は <a href="USER_MANUAL.md" target="_blank"
+            style="color:#0073bb;text-decoration:underline;">詳細マニュアル（USER_MANUAL.md）</a> をご覧ください。
         </p>
       </section>
 
       <section id="manualAdmin" class="manual-section manual-tab-content">
         <h4>⚙️ 管理者マニュアル</h4>
-        
+
         <div style="background:#fff3cd;padding:12px;margin:12px 0;border-left:4px solid #ffc107;border-radius:4px;">
           <strong>🔐 管理者ログインについて</strong><br>
           管理パネルを表示するには、<strong>管理者パスワード</strong>でログインしてください。<br>
@@ -735,11 +826,14 @@
 
         <h5>📥 2. CSVインポート - 名簿の一括登録・更新</h5>
         <p><strong>用途</strong>：Excelで編集した名簿を一括で取り込みます（名簿全体が置き換わります）</p>
-        
+
         <p style="margin:12px 0 8px 0;"><strong>対応しているCSV形式</strong></p>
         <ul style="line-height:1.8;">
-          <li><strong>最新形式（推奨）</strong>：<code>1行目: 在席管理CSV / 2行目: グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</code></li>
-          <li><strong>標準形式</strong>：<code>グループ番号,グループ名,表示順,id,氏名,内線,業務時間,ステータス,戻り時間,備考</code>（携帯番号・Email列なし、タイトル行なし）</li>
+          <li>
+            <strong>最新形式（推奨）</strong>：<code>1行目: 在席管理CSV / 2行目: グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</code>
+          </li>
+          <li><strong>標準形式</strong>：<code>グループ番号,グループ名,表示順,id,氏名,内線,業務時間,ステータス,戻り時間,備考</code>（携帯番号・Email列なし、タイトル行なし）
+          </li>
           <li><strong>旧形式</strong>：<code>グループ番号,グループ名,表示順,id,氏名,内線,ステータス,戻り時間,備考</code>（業務時間列なし。既存データから引き継ぎます）</li>
         </ul>
 
@@ -787,7 +881,7 @@
 
         <h5>📢 5. お知らせ管理</h5>
         <p><strong>用途</strong>：拠点のメンバー全員に重要な情報を掲示します</p>
-        
+
         <div style="background:#e7f8e7;padding:12px;margin:12px 0;border-left:4px solid #4ade80;border-radius:4px;">
           <strong>✨ 自動読み込み機能</strong><br>
           管理パネルを開くと、現在のお知らせが<strong>自動的に表示</strong>されます。<br>
@@ -838,7 +932,7 @@
 
         <h5>📅 5. イベント管理</h5>
         <p><strong>用途</strong>：GW、年末年始、夏季休暇など、複数日にわたる休暇を事前に登録・管理します</p>
-        
+
         <div style="background:#e7f8e7;padding:12px;margin:12px 0;border-left:4px solid #4ade80;border-radius:4px;">
           <strong>✨ イベント機能の特長</strong>
           <ul style="margin:8px 0;line-height:1.8;">
@@ -994,7 +1088,8 @@
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. メニュー設定のJSONが正しいか不安</summary>
-          <p style="margin:8px 0 8px 20px;">A. オンラインのJSONバリデーター（例：jsonlint.com）で確認できます。保存時にエラーが出た場合は「現在の設定を読み込み」で元に戻してください。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            オンラインのJSONバリデーター（例：jsonlint.com）で確認できます。保存時にエラーが出た場合は「現在の設定を読み込み」で元に戻してください。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントのガントチャートが表示されません</summary>
@@ -1014,7 +1109,8 @@
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 休暇種別（休暇固定）を変更したい</summary>
-          <p style="margin:8px 0 8px 20px;">A. 「登録済みのイベント」一覧の「休暇固定（種別）」列をクリックすると、ドロップダウンから種別（休み、休暇、特休、有給、代休など）を選択できます。選択すると即座に保存されます。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            「登録済みのイベント」一覧の「休暇固定（種別）」列をクリックすると、ドロップダウンから種別（休み、休暇、特休、有給、代休など）を選択できます。選択すると即座に保存されます。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントの色を変更したい</summary>
@@ -1022,15 +1118,19 @@
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 複数のイベントを同時に表示できますか？</summary>
-          <p style="margin:8px 0 8px 20px;">A. 管理者は複数のイベントを「表示する」に設定できますが、ユーザーが実際に選択できるのは1つだけです。ユーザーはイベントボタンから選択して切り替えることができます。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            管理者は複数のイベントを「表示する」に設定できますが、ユーザーが実際に選択できるのは1つだけです。ユーザーはイベントボタンから選択して切り替えることができます。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. ユーザーが個別に変更した休暇日を管理者が確認できますか？</summary>
-          <p style="margin:8px 0 8px 20px;">A. ユーザーが長期休暇カレンダーで変更した内容は、そのユーザーの「メンバーの休暇指定ビット（membersBits）」として保存されています。管理者はCSVエクスポートで確認できますが、直接編集する機能は現在ありません。各ユーザーが自分で長期休暇カレンダーから変更してください。</p>
+          <p style="margin:8px 0 8px 20px;">A.
+            ユーザーが長期休暇カレンダーで変更した内容は、そのユーザーの「メンバーの休暇指定ビット（membersBits）」として保存されています。管理者はCSVエクスポートで確認できますが、直接編集する機能は現在ありません。各ユーザーが自分で長期休暇カレンダーから変更してください。
+          </p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. ガントチャートで設定した休暇日が反映されない</summary>
-          <p style="margin:8px 0 8px 20px;">A. ガントチャートでセルをクリック/ドラッグした後、必ず「💾 作成/更新」ボタンをクリックして保存してください。また、ユーザー側で該当イベントを選択していない場合は、休暇日として反映されません。</p>
+          <p style="margin:8px 0 8px 20px;">A. ガントチャートでセルをクリック/ドラッグした後、必ず「💾
+            作成/更新」ボタンをクリックして保存してください。また、ユーザー側で該当イベントを選択していない場合は、休暇日として反映されません。</p>
         </details>
         <details style="margin:8px 0;">
           <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントの対象拠点を変更したい</summary>
@@ -1039,7 +1139,8 @@
 
         <p style="margin-top:16px;font-size:0.95em;">
           <strong>📚 さらに詳しく知りたい方へ</strong><br>
-          より詳細な情報は <a href="ADMIN_MANUAL.md" target="_blank" style="color:#0073bb;text-decoration:underline;">管理者向け詳細マニュアル（ADMIN_MANUAL.md）</a> をご覧ください。
+          より詳細な情報は <a href="ADMIN_MANUAL.md" target="_blank"
+            style="color:#0073bb;text-decoration:underline;">管理者向け詳細マニュアル（ADMIN_MANUAL.md）</a> をご覧ください。
         </p>
       </section>
     </div>
@@ -1058,7 +1159,7 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  
+
   <!-- お知らせエリア -->
   <div id="noticesArea" class="notices-area" style="display:none">
     <div class="notices-container">
@@ -1070,10 +1171,13 @@
     </div>
   </div>
 
-  <div class="wrap"><div id="board" class="board" style="display:none"></div></div>
+  <div class="wrap">
+    <div id="board" class="board" style="display:none"></div>
+  </div>
   <div id="diag" class="diag"></div>
   <script src="js/config.js"></script>
-　<script src="js/globals.js"></script>
+  　
+  <script src="js/globals.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/layout.js"></script>
   <script src="js/filters.js"></script>
@@ -1088,4 +1192,5 @@
   <script src="main.js"></script>
 
 </body>
+
 </html>
