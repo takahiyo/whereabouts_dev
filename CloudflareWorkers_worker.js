@@ -84,6 +84,20 @@ export default {
         }
         return json;
       };
+      const firestoreBatchWrite = async (writes) => {
+        if (!writes.length) return { status: 'empty' };
+        const url = `${baseUrl}:batchWrite`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ writes })
+        });
+        const json = await res.json();
+        if (res.status !== 200) {
+          throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
+        }
+        return json;
+      };
       const firestoreDelete = async (path) => {
         const url = `${baseUrl}/${path}`;
         const res = await fetch(url, {
@@ -185,10 +199,38 @@ export default {
 
       if (action === 'getConfigFor') {
         const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
-        const cfgDoc = await firestoreFetchOptional(`offices/${officeId}/config`);
+        const configCollectionPath = `offices/${officeId}/config`;
+        const configDocPath = `${configCollectionPath}/config`;
+        const legacyConfigDocPath = `offices/${officeId}/config`;
+        const legacyOfficeDocPath = `offices/${officeId}`;
+        let cfgDoc = await firestoreFetchOptional(configDocPath);
         let cfgFromDoc = null;
-        if (cfgDoc) {
+        const migrateConfigDoc = async (doc) => {
+          const normalized = normalizeConfig(fromFirestoreDoc(doc));
+          const configFields = {
+            version: toFirestoreValue(normalized.version),
+            updated: toFirestoreValue(normalized.updated),
+            groups: toFirestoreValue(normalized.groups || []),
+            menus: toFirestoreValue(normalized.menus || {})
+          };
+          await firestoreUpsert(configCollectionPath, 'config', { fields: configFields });
+          return normalized;
+        };
+        if (!cfgDoc) {
+          const legacyConfigDoc = await firestoreFetchOptional(legacyConfigDocPath);
+          if (legacyConfigDoc) {
+            cfgFromDoc = await migrateConfigDoc(legacyConfigDoc);
+          } else {
+            const legacyOfficeDoc = await firestoreFetchOptional(legacyOfficeDocPath);
+            if (legacyOfficeDoc?.fields?.groups || legacyOfficeDoc?.fields?.menus) {
+              cfgFromDoc = await migrateConfigDoc(legacyOfficeDoc);
+            }
+          }
+        }
+        if (cfgDoc && !cfgFromDoc) {
           cfgFromDoc = normalizeConfig(fromFirestoreDoc(cfgDoc));
+        }
+        if (cfgFromDoc) {
           const hasMembers = (cfgFromDoc.groups || []).some(g => (g.members || []).length > 0);
           if (hasMembers) {
             return new Response(JSON.stringify(cfgFromDoc), { headers: corsHeaders });
@@ -237,6 +279,7 @@ export default {
 
       if (action === 'setConfigFor') {
         const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
+        const configCollectionPath = `offices/${officeId}/config`;
         let incoming;
         try {
           incoming = JSON.parse(formData.get('data') || '{}') || {};
@@ -280,7 +323,7 @@ export default {
           groups: toFirestoreValue(parsed.groups || []),
           menus: toFirestoreValue(parsed.menus || {})
         };
-        await firestoreUpsert(`offices/${officeId}`, 'config', { fields: configFields });
+        await firestoreUpsert(configCollectionPath, 'config', { fields: configFields });
 
         const desiredIds = new Set();
         let order = 0;
@@ -301,27 +344,32 @@ export default {
               email: toFirestoreValue(member.email || ''),
               workHours: toFirestoreValue(member.workHours == null ? '' : String(member.workHours))
             };
-            memberWrites.push(
-              () => firestoreUpsert(`offices/${officeId}/members`, id, {
+            memberWrites.push({
+              update: {
+                name: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/members/${encodeURIComponent(id)}`,
                 fields
-              }, ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'])
-            );
+              },
+              updateMask: { fieldPaths: ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'] }
+            });
           });
         });
 
-        // --- Fix: Batch writes to avoid 500 errors ---
-        const BATCH_SIZE = 15;
-        for (let i = 0; i < memberWrites.length; i += BATCH_SIZE) {
-          const batch = memberWrites.slice(i, i + BATCH_SIZE).map(fn => fn());
-          await Promise.all(batch);
+        // --- Fix: Batch writes to avoid subrequest limits ---
+        const BATCH_WRITE_SIZE = 200;
+        for (let i = 0; i < memberWrites.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(memberWrites.slice(i, i + BATCH_WRITE_SIZE));
         }
 
         const existing = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
         const deletions = (existing.documents || [])
           .map(doc => doc.name.split('/').pop())
           .filter(id => id && !desiredIds.has(id))
-          .map(id => firestoreDelete(`offices/${officeId}/members/${encodeURIComponent(id)}`));
-        await Promise.all(deletions);
+          .map(id => ({
+            delete: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/members/${encodeURIComponent(id)}`
+          }));
+        for (let i = 0; i < deletions.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(deletions.slice(i, i + BATCH_WRITE_SIZE));
+        }
 
         return new Response(JSON.stringify(parsed), { headers: corsHeaders });
       }
