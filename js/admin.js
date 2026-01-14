@@ -571,6 +571,13 @@ async function handleMemberSave() {
     const cfgToSet = { version: 2, updated: Date.now(), groups, menus: MENUS || undefined };
     const r1 = await adminSetConfigFor(office, cfgToSet);
     if (!(r1 && r1.ok !== false)) { toast('名簿の保存に失敗しました', false); return; }
+    if (office === CURRENT_OFFICE_ID && typeof normalizeConfigClient === 'function') {
+      GROUPS = normalizeConfigClient({ groups });
+      CONFIG_UPDATED = cfgToSet.updated;
+      if (typeof render === 'function') {
+        render();
+      }
+    }
     const r2 = await adminSetForChunked(office, dataObj);
     if (!(r2 && r2.ok !== false)) toast('在席データの保存に失敗しました', false);
     else toast('保存しました');
