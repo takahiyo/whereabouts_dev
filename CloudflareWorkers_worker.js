@@ -84,6 +84,20 @@ export default {
         }
         return json;
       };
+      const firestoreBatchWrite = async (writes) => {
+        if (!writes.length) return { status: 'empty' };
+        const url = `${baseUrl}:batchWrite`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ writes })
+        });
+        const json = await res.json();
+        if (res.status !== 200) {
+          throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
+        }
+        return json;
+      };
       const firestoreDelete = async (path) => {
         const url = `${baseUrl}/${path}`;
         const res = await fetch(url, {
@@ -330,27 +344,32 @@ export default {
               email: toFirestoreValue(member.email || ''),
               workHours: toFirestoreValue(member.workHours == null ? '' : String(member.workHours))
             };
-            memberWrites.push(
-              () => firestoreUpsert(`offices/${officeId}/members`, id, {
+            memberWrites.push({
+              update: {
+                name: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/members/${encodeURIComponent(id)}`,
                 fields
-              }, ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'])
-            );
+              },
+              updateMask: { fieldPaths: ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'] }
+            });
           });
         });
 
-        // --- Fix: Batch writes to avoid 500 errors ---
-        const BATCH_SIZE = 15;
-        for (let i = 0; i < memberWrites.length; i += BATCH_SIZE) {
-          const batch = memberWrites.slice(i, i + BATCH_SIZE).map(fn => fn());
-          await Promise.all(batch);
+        // --- Fix: Batch writes to avoid subrequest limits ---
+        const BATCH_WRITE_SIZE = 200;
+        for (let i = 0; i < memberWrites.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(memberWrites.slice(i, i + BATCH_WRITE_SIZE));
         }
 
         const existing = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
         const deletions = (existing.documents || [])
           .map(doc => doc.name.split('/').pop())
           .filter(id => id && !desiredIds.has(id))
-          .map(id => firestoreDelete(`offices/${officeId}/members/${encodeURIComponent(id)}`));
-        await Promise.all(deletions);
+          .map(id => ({
+            delete: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/members/${encodeURIComponent(id)}`
+          }));
+        for (let i = 0; i < deletions.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(deletions.slice(i, i + BATCH_WRITE_SIZE));
+        }
 
         return new Response(JSON.stringify(parsed), { headers: corsHeaders });
       }
