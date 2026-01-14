@@ -245,6 +245,19 @@ export default {
         }
         const nowTs = Date.now();
         const parsed = normalizeConfig({ ...incoming, updated: nowTs });
+
+        // --- Fix: Assign IDs to members missing them ---
+        let newIdCounter = 0;
+        const randomSuffix = () => Math.random().toString(36).substring(2, 6);
+        (parsed.groups || []).forEach(group => {
+          (group.members || []).forEach(member => {
+            if (!member.id || member.id.trim() === '') {
+              newIdCounter++;
+              member.id = `mem_${nowTs}_${newIdCounter}_${randomSuffix()}`;
+            }
+          });
+        });
+
         const configFields = {
           version: toFirestoreValue(parsed.version),
           updated: toFirestoreValue(parsed.updated),
@@ -273,13 +286,19 @@ export default {
               workHours: toFirestoreValue(member.workHours == null ? '' : String(member.workHours))
             };
             memberWrites.push(
-              firestoreUpsert(`offices/${officeId}/members`, id, {
+              () => firestoreUpsert(`offices/${officeId}/members`, id, {
                 fields
               }, ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'])
             );
           });
         });
-        await Promise.all(memberWrites);
+
+        // --- Fix: Batch writes to avoid 500 errors ---
+        const BATCH_SIZE = 15;
+        for (let i = 0; i < memberWrites.length; i += BATCH_SIZE) {
+          const batch = memberWrites.slice(i, i + BATCH_SIZE).map(fn => fn());
+          await Promise.all(batch);
+        }
 
         const existing = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
         const deletions = (existing.documents || [])
