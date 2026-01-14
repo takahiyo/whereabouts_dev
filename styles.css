@@ -504,6 +504,9 @@
   .member-row-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .member-drag-handle{cursor:grab;display:inline-flex;align-items:center;justify-content:center;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#6b7280;font-size:13px;}
   .member-drag-handle:active{cursor:grabbing;box-shadow:inset 0 1px 2px rgba(0,0,0,0.12);}
+  .group-order-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+  .group-order-item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;}
+  .group-order-actions{display:flex;align-items:center;gap:6px;}
 .member-filter-row{display:flex;gap:12px;align-items:center;margin:6px 0 4px;flex-wrap:wrap;}
 .member-filter-label{font-weight:700;color:#374151;min-width:92px;display:flex;align-items:center;}
 .member-filter-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
