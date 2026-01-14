@@ -1,4 +1,6 @@
 /* 管理UIイベント */
+const groupOrderList = document.getElementById('groupOrderList');
+const groupOrderEmpty = document.getElementById('groupOrderEmpty');
 if (adminOfficeSel) {
   adminOfficeSel.addEventListener('change', () => {
     adminSelectedOfficeId = adminOfficeSel.value || '';
@@ -238,6 +240,7 @@ async function loadAdminMembers(force) {
     });
     normalizeMemberOrdering();
     renderMemberTable();
+    renderGroupOrderList();
     openMemberEditor(null);
     adminMembersLoaded = true;
   } catch (err) {
@@ -247,8 +250,16 @@ async function loadAdminMembers(force) {
 }
 
 function normalizeMemberOrdering() {
-  const orderBase = [...adminGroupOrder];
-  adminMemberList.forEach(m => { if (m.group && !orderBase.includes(m.group)) { orderBase.push(m.group); } });
+  const orderBase = [];
+  adminGroupOrder.forEach(g => {
+    const name = String(g || '');
+    if (!name.trim()) return;
+    if (!orderBase.includes(name)) orderBase.push(name);
+  });
+  adminMemberList.forEach(m => {
+    const name = String(m.group || '');
+    if (name && !orderBase.includes(name)) { orderBase.push(name); }
+  });
   adminGroupOrder = orderBase;
   adminMemberList.sort((a, b) => {
     const ga = orderBase.indexOf(a.group); const gb = orderBase.indexOf(b.group);
@@ -261,6 +272,55 @@ function normalizeMemberOrdering() {
     m.order = cur;
     counters.set(m.group, cur + 1);
   });
+}
+
+function renderGroupOrderList() {
+  if (!groupOrderList) return;
+  groupOrderList.textContent = '';
+  const order = [...new Set(adminGroupOrder.filter(g => (g || '').trim() !== ''))];
+  if (groupOrderEmpty) {
+    groupOrderEmpty.style.display = order.length ? 'none' : 'block';
+  }
+  order.forEach((groupName, idx) => {
+    const item = document.createElement('div');
+    item.className = 'group-order-item';
+    item.dataset.groupName = groupName;
+    const label = document.createElement('span');
+    label.textContent = groupName;
+    const actions = document.createElement('div');
+    actions.className = 'group-order-actions';
+    const upBtn = document.createElement('button');
+    upBtn.className = 'btn-move-up';
+    upBtn.textContent = '▲';
+    upBtn.title = '上に移動';
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener('click', () => moveGroupOrder(groupName, -1));
+    const downBtn = document.createElement('button');
+    downBtn.className = 'btn-move-down';
+    downBtn.textContent = '▼';
+    downBtn.title = '下に移動';
+    downBtn.disabled = idx === order.length - 1;
+    downBtn.addEventListener('click', () => moveGroupOrder(groupName, 1));
+    actions.append(upBtn, downBtn);
+    item.append(label, actions);
+    groupOrderList.appendChild(item);
+  });
+}
+
+function moveGroupOrder(groupName, dir) {
+  const order = [...new Set(adminGroupOrder.filter(g => (g || '').trim() !== ''))];
+  const idx = order.indexOf(groupName);
+  if (idx < 0) return;
+  const targetIdx = idx + dir;
+  if (targetIdx < 0 || targetIdx >= order.length) return;
+  const nextOrder = [...order];
+  const [moving] = nextOrder.splice(idx, 1);
+  nextOrder.splice(targetIdx, 0, moving);
+  adminGroupOrder = nextOrder;
+  normalizeMemberOrdering();
+  renderMemberTable();
+  renderGroupOrderList();
+  refreshMemberGroupOptions();
 }
 
 function filteredMemberList() {
@@ -404,6 +464,7 @@ function submitMemberEdit() {
     adminMemberList.push({ id, name, ext, mobile, email, group, order, workHours: '' });
   }
   normalizeMemberOrdering();
+  renderGroupOrderList();
   renderMemberTable();
   openMemberEditor(null);
 }
@@ -415,6 +476,7 @@ function deleteMember(id) {
   if (!id) return; if (!confirm('このメンバーを削除しますか？')) return;
   adminMemberList = adminMemberList.filter(m => m.id !== id);
   normalizeMemberOrdering();
+  renderGroupOrderList();
   renderMemberTable();
 }
 
@@ -509,6 +571,13 @@ async function handleMemberSave() {
     const cfgToSet = { version: 2, updated: Date.now(), groups, menus: MENUS || undefined };
     const r1 = await adminSetConfigFor(office, cfgToSet);
     if (!(r1 && r1.ok !== false)) { toast('名簿の保存に失敗しました', false); return; }
+    if (office === CURRENT_OFFICE_ID && typeof normalizeConfigClient === 'function') {
+      GROUPS = normalizeConfigClient({ groups });
+      CONFIG_UPDATED = cfgToSet.updated;
+      if (typeof render === 'function') {
+        render();
+      }
+    }
     const r2 = await adminSetForChunked(office, dataObj);
     if (!(r2 && r2.ok !== false)) toast('在席データの保存に失敗しました', false);
     else toast('保存しました');
