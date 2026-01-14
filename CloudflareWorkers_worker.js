@@ -59,6 +59,31 @@ export default {
         }
         return json;
       };
+      const firestoreUpsert = async (collectionPath, docId, body, updateMask = []) => {
+        const encodedId = encodeURIComponent(docId);
+        const params = updateMask.length
+          ? `?${updateMask.map(f => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&')}`
+          : '';
+        const patchUrl = `${baseUrl}/${collectionPath}/${encodedId}${params}`;
+        let res = await fetch(patchUrl, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (res.status === 404) {
+          const createUrl = `${baseUrl}/${collectionPath}?documentId=${encodedId}`;
+          res = await fetch(createUrl, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+        }
+        const json = await res.json();
+        if (res.status !== 200) {
+          throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
+        }
+        return json;
+      };
       const firestoreDelete = async (path) => {
         const url = `${baseUrl}/${path}`;
         const res = await fetch(url, {
@@ -248,7 +273,7 @@ export default {
               workHours: toFirestoreValue(member.workHours == null ? '' : String(member.workHours))
             };
             memberWrites.push(
-              firestorePatch(`offices/${officeId}/members/${encodeURIComponent(id)}`, {
+              firestoreUpsert(`offices/${officeId}/members`, id, {
                 fields
               }, ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'])
             );
@@ -310,7 +335,8 @@ export default {
             fields.ext = toFirestoreValue(s.ext == null ? '' : String(s.ext));
             updateMask.push('ext');
           }
-          return firestorePatch(`offices/${officeId}/members/${encodeURIComponent(userId)}`,
+          return firestoreUpsert(`offices/${officeId}/members`,
+            userId,
             { fields },
             updateMask
           );
