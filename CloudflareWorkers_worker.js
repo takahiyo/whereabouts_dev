@@ -246,6 +246,18 @@ export default {
         const nowTs = Date.now();
         const parsed = normalizeConfig({ ...incoming, updated: nowTs });
 
+
+        // Helper: Sanitize document ID to be Firestore-compatible
+        const sanitizeDocId = (id) => {
+          if (!id) return '';
+          // Remove or replace invalid characters: /, .., and anything that might cause issues
+          return String(id)
+            .replace(/\//g, '_')  // Replace slashes with underscores
+            .replace(/\.\./g, '__')  // Replace double dots
+            .replace(/^__/, 'id_')  // Firestore doesn't allow IDs starting with __
+            .trim();
+        };
+
         // --- Fix: Assign IDs to members missing them ---
         let newIdCounter = 0;
         const randomSuffix = () => Math.random().toString(36).substring(2, 6);
@@ -254,10 +266,13 @@ export default {
             if (!member.id || member.id.trim() === '') {
               newIdCounter++;
               member.id = `mem_${nowTs}_${newIdCounter}_${randomSuffix()}`;
+            } else {
+              // Sanitize existing IDs
+              member.id = sanitizeDocId(member.id);
             }
-            member.id = member.id.replace(/\//g, '_');
           });
         });
+
 
         const configFields = {
           version: toFirestoreValue(parsed.version),
