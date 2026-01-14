@@ -185,10 +185,38 @@ export default {
 
       if (action === 'getConfigFor') {
         const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
-        const cfgDoc = await firestoreFetchOptional(`offices/${officeId}/config`);
+        const configCollectionPath = `offices/${officeId}/config`;
+        const configDocPath = `${configCollectionPath}/config`;
+        const legacyConfigDocPath = `offices/${officeId}/config`;
+        const legacyOfficeDocPath = `offices/${officeId}`;
+        let cfgDoc = await firestoreFetchOptional(configDocPath);
         let cfgFromDoc = null;
-        if (cfgDoc) {
+        const migrateConfigDoc = async (doc) => {
+          const normalized = normalizeConfig(fromFirestoreDoc(doc));
+          const configFields = {
+            version: toFirestoreValue(normalized.version),
+            updated: toFirestoreValue(normalized.updated),
+            groups: toFirestoreValue(normalized.groups || []),
+            menus: toFirestoreValue(normalized.menus || {})
+          };
+          await firestoreUpsert(configCollectionPath, 'config', { fields: configFields });
+          return normalized;
+        };
+        if (!cfgDoc) {
+          const legacyConfigDoc = await firestoreFetchOptional(legacyConfigDocPath);
+          if (legacyConfigDoc) {
+            cfgFromDoc = await migrateConfigDoc(legacyConfigDoc);
+          } else {
+            const legacyOfficeDoc = await firestoreFetchOptional(legacyOfficeDocPath);
+            if (legacyOfficeDoc?.fields?.groups || legacyOfficeDoc?.fields?.menus) {
+              cfgFromDoc = await migrateConfigDoc(legacyOfficeDoc);
+            }
+          }
+        }
+        if (cfgDoc && !cfgFromDoc) {
           cfgFromDoc = normalizeConfig(fromFirestoreDoc(cfgDoc));
+        }
+        if (cfgFromDoc) {
           const hasMembers = (cfgFromDoc.groups || []).some(g => (g.members || []).length > 0);
           if (hasMembers) {
             return new Response(JSON.stringify(cfgFromDoc), { headers: corsHeaders });
@@ -237,6 +265,7 @@ export default {
 
       if (action === 'setConfigFor') {
         const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
+        const configCollectionPath = `offices/${officeId}/config`;
         let incoming;
         try {
           incoming = JSON.parse(formData.get('data') || '{}') || {};
@@ -280,7 +309,7 @@ export default {
           groups: toFirestoreValue(parsed.groups || []),
           menus: toFirestoreValue(parsed.menus || {})
         };
-        await firestoreUpsert(`offices/${officeId}`, 'config', { fields: configFields });
+        await firestoreUpsert(configCollectionPath, 'config', { fields: configFields });
 
         const desiredIds = new Set();
         let order = 0;
