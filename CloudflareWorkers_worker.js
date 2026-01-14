@@ -33,6 +33,44 @@ export default {
         }
         return json;
       };
+      const firestoreFetchOptional = async (path) => {
+        const url = `${baseUrl}/${path}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (res.status === 404) return null;
+        const json = await res.json();
+        if (res.status !== 200) {
+          throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
+        }
+        return json;
+      };
+      const firestorePatch = async (path, body, updateMask = []) => {
+        const params = updateMask.length
+          ? `?${updateMask.map(f => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&')}`
+          : '';
+        const url = `${baseUrl}/${path}${params}`;
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const json = await res.json();
+        if (res.status !== 200) {
+          throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
+        }
+        return json;
+      };
+      const firestoreDelete = async (path) => {
+        const url = `${baseUrl}/${path}`;
+        const res = await fetch(url, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (res.status !== 200) {
+          const json = await res.json();
+          throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
+        }
+        return true;
+      };
 
       // 2. アクションごとの処理
 
@@ -95,6 +133,181 @@ export default {
           groups: Object.values(groupsMap),
           updated
         }), { headers: corsHeaders });
+      }
+
+      if (action === 'getFor') {
+        const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
+        const json = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
+        const dataMap = {};
+        const updatedCandidates = (json.documents || [])
+          .map(doc => doc.updateTime)
+          .filter(Boolean)
+          .map(v => Date.parse(v))
+          .filter(v => Number.isFinite(v));
+        const updated = updatedCandidates.length ? Math.max(...updatedCandidates) : Date.now();
+        (json.documents || []).forEach(doc => {
+          const f = doc.fields || {};
+          dataMap[doc.name.split('/').pop()] = {
+            status: f.status?.stringValue || '',
+            time: f.time?.stringValue || '',
+            note: f.note?.stringValue || '',
+            workHours: f.workHours?.stringValue || '',
+            ext: f.ext?.stringValue || ''
+          };
+        });
+        return new Response(JSON.stringify({ updated, data: dataMap }), { headers: corsHeaders });
+      }
+
+      if (action === 'getConfigFor') {
+        const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
+        const cfgDoc = await firestoreFetchOptional(`offices/${officeId}/config`);
+        if (cfgDoc) {
+          const cfg = normalizeConfig(fromFirestoreDoc(cfgDoc));
+          return new Response(JSON.stringify(cfg), { headers: corsHeaders });
+        }
+        const json = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
+        const members = (json.documents || []).map(doc => {
+          const f = doc.fields || {};
+          return {
+            id: doc.name.split('/').pop(),
+            name: f.name?.stringValue || '',
+            group: f.group?.stringValue || '',
+            order: Number(f.order?.integerValue || f.order?.doubleValue || 0),
+            ext: f.ext?.stringValue || '',
+            mobile: f.mobile?.stringValue || '',
+            email: f.email?.stringValue || '',
+            workHours: f.workHours?.stringValue || ''
+          };
+        });
+        const groupsMap = {};
+        members.sort((a, b) => a.order - b.order).forEach(m => {
+          if (!groupsMap[m.group]) groupsMap[m.group] = { title: m.group, members: [] };
+          groupsMap[m.group].members.push({
+            id: m.id,
+            name: m.name,
+            ext: m.ext,
+            mobile: m.mobile,
+            email: m.email,
+            workHours: m.workHours
+          });
+        });
+        const updatedCandidates = (json.documents || [])
+          .map(doc => doc.updateTime)
+          .filter(Boolean)
+          .map(v => Date.parse(v))
+          .filter(v => Number.isFinite(v));
+        const updated = updatedCandidates.length ? Math.max(...updatedCandidates) : Date.now();
+        const cfg = normalizeConfig({ groups: Object.values(groupsMap), updated });
+        return new Response(JSON.stringify(cfg), { headers: corsHeaders });
+      }
+
+      if (action === 'setConfigFor') {
+        const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
+        let incoming;
+        try {
+          incoming = JSON.parse(formData.get('data') || '{}') || {};
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'bad_json' }), { headers: corsHeaders });
+        }
+        const nowTs = Date.now();
+        const parsed = normalizeConfig({ ...incoming, updated: nowTs });
+        const configFields = {
+          version: toFirestoreValue(parsed.version),
+          updated: toFirestoreValue(parsed.updated),
+          groups: toFirestoreValue(parsed.groups || []),
+          menus: toFirestoreValue(parsed.menus || {})
+        };
+        await firestorePatch(`offices/${officeId}/config`, { fields: configFields });
+
+        const desiredIds = new Set();
+        let order = 0;
+        const memberWrites = [];
+        (parsed.groups || []).forEach(group => {
+          const title = group.title || '';
+          (group.members || []).forEach(member => {
+            const id = String(member.id || '').trim();
+            if (!id) return;
+            desiredIds.add(id);
+            order += 1;
+            const fields = {
+              name: toFirestoreValue(member.name || ''),
+              group: toFirestoreValue(title),
+              order: toFirestoreValue(order),
+              ext: toFirestoreValue(member.ext || ''),
+              mobile: toFirestoreValue(member.mobile || ''),
+              email: toFirestoreValue(member.email || ''),
+              workHours: toFirestoreValue(member.workHours == null ? '' : String(member.workHours))
+            };
+            memberWrites.push(
+              firestorePatch(`offices/${officeId}/members/${encodeURIComponent(id)}`, {
+                fields
+              }, ['name', 'group', 'order', 'ext', 'mobile', 'email', 'workHours'])
+            );
+          });
+        });
+        await Promise.all(memberWrites);
+
+        const existing = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
+        const deletions = (existing.documents || [])
+          .map(doc => doc.name.split('/').pop())
+          .filter(id => id && !desiredIds.has(id))
+          .map(id => firestoreDelete(`offices/${officeId}/members/${encodeURIComponent(id)}`));
+        await Promise.all(deletions);
+
+        return new Response(JSON.stringify(parsed), { headers: corsHeaders });
+      }
+
+      if (action === 'setFor') {
+        const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
+        let incoming;
+        try {
+          incoming = JSON.parse(formData.get('data') || '{}') || {};
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'bad_json' }), { headers: corsHeaders });
+        }
+        const incomingData = incoming.data || {};
+        const full = !!incoming.full;
+
+        if (full) {
+          const existing = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
+          const incomingIds = new Set(Object.keys(incomingData));
+          const clears = (existing.documents || [])
+            .map(doc => doc.name.split('/').pop())
+            .filter(id => id && !incomingIds.has(id))
+            .map(id => firestorePatch(`offices/${officeId}/members/${encodeURIComponent(id)}`, {
+              fields: {
+                status: toFirestoreValue(''),
+                time: toFirestoreValue(''),
+                note: toFirestoreValue(''),
+                workHours: toFirestoreValue('')
+              }
+            }, ['status', 'time', 'note', 'workHours']));
+          await Promise.all(clears);
+        }
+
+        const updates = Object.keys(incomingData).map(async (userId) => {
+          const s = incomingData[userId] || {};
+          const fields = {
+            status: toFirestoreValue(s.status == null ? '' : String(s.status)),
+            time: toFirestoreValue(s.time == null ? '' : String(s.time)),
+            note: toFirestoreValue(s.note == null ? '' : String(s.note))
+          };
+          const updateMask = ['status', 'time', 'note'];
+          if (Object.prototype.hasOwnProperty.call(s, 'workHours')) {
+            fields.workHours = toFirestoreValue(s.workHours == null ? '' : String(s.workHours));
+            updateMask.push('workHours');
+          }
+          if (Object.prototype.hasOwnProperty.call(s, 'ext')) {
+            fields.ext = toFirestoreValue(s.ext == null ? '' : String(s.ext));
+            updateMask.push('ext');
+          }
+          return firestorePatch(`offices/${officeId}/members/${encodeURIComponent(userId)}`,
+            { fields },
+            updateMask
+          );
+        });
+        await Promise.all(updates);
+        return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
 
       // get: ステータスのみ取得
@@ -185,4 +398,111 @@ async function getGoogleAuthToken(env) {
     body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${header}.${claim}.${strSig}`
   });
   return (await res.json()).access_token;
+}
+
+function defaultMenus() {
+  return {
+    timeStepMinutes: 30,
+    statuses: [
+      { value: "在席", class: "st-here", clearOnSet: true },
+      { value: "外出", requireTime: true, class: "st-out" },
+      { value: "在宅勤務", class: "st-remote", clearOnSet: true },
+      { value: "出張", requireTime: true, class: "st-trip" },
+      { value: "研修", requireTime: true, class: "st-training" },
+      { value: "健康診断", requireTime: true, class: "st-health" },
+      { value: "コアドック", requireTime: true, class: "st-coadoc" },
+      { value: "帰宅", class: "st-home", clearOnSet: true },
+      { value: "休み", class: "st-off", clearOnSet: true }
+    ],
+    noteOptions: ["直出", "直帰", "直出・直帰"],
+    businessHours: [
+      "07:00-15:30",
+      "07:30-16:00",
+      "08:00-16:30",
+      "08:30-17:00",
+      "09:00-17:30",
+      "09:30-18:00",
+      "10:00-18:30",
+      "10:30-19:00",
+      "11:00-19:30",
+      "11:30-20:00",
+      "12:00-20:30"
+    ]
+  };
+}
+
+function normalizeConfig(cfg) {
+  const groupsSrc = Array.isArray(cfg?.groups) ? cfg.groups : [];
+  return {
+    version: 2,
+    updated: Number(cfg?.updated || 0),
+    groups: groupsSrc.map(g => {
+      const members = Array.isArray(g?.members) ? g.members : [];
+      return {
+        title: String(g?.title || ''),
+        members: members.map(m => ({
+          id: String(m?.id || '').trim(),
+          name: String(m?.name || ''),
+          ext: String(m?.ext || ''),
+          mobile: String(m?.mobile || ''),
+          email: String(m?.email || ''),
+          workHours: m?.workHours == null ? '' : String(m.workHours)
+        })).filter(m => m.id || m.name)
+      };
+    }),
+    menus: (cfg?.menus && typeof cfg.menus === 'object') ? cfg.menus : defaultMenus()
+  };
+}
+
+function fromFirestoreDoc(doc) {
+  const fields = doc?.fields || {};
+  const out = {};
+  Object.keys(fields).forEach(key => {
+    out[key] = fromFirestoreValue(fields[key]);
+  });
+  return out;
+}
+
+function fromFirestoreValue(value) {
+  if (!value || typeof value !== 'object') return null;
+  if ('stringValue' in value) return value.stringValue;
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return Number(value.doubleValue);
+  if ('timestampValue' in value) return value.timestampValue;
+  if ('nullValue' in value) return null;
+  if ('arrayValue' in value) {
+    const values = value.arrayValue.values || [];
+    return values.map(fromFirestoreValue);
+  }
+  if ('mapValue' in value) {
+    const fields = value.mapValue.fields || {};
+    const out = {};
+    Object.keys(fields).forEach(key => {
+      out[key] = fromFirestoreValue(fields[key]);
+    });
+    return out;
+  }
+  return null;
+}
+
+function toFirestoreValue(value) {
+  if (value == null) return { nullValue: null };
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map(toFirestoreValue) } };
+  }
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    if (Number.isInteger(value)) return { integerValue: String(value) };
+    return { doubleValue: value };
+  }
+  if (typeof value === 'object') {
+    const fields = {};
+    Object.keys(value).forEach(key => {
+      fields[key] = toFirestoreValue(value[key]);
+    });
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(value) };
 }
