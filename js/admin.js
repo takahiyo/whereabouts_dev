@@ -49,126 +49,45 @@ btnImport.addEventListener('click', async () => {
   const normalizedText = text.replace(/^\uFEFF/, '');
   const rows = parseCSV(normalizedText);
   if (!rows.length) { toast('CSVが空です', false); return; }
-  const titleMarkers = ['在席管理CSV', 'whereabouts presence csv'];
-  const titleRowDetected = (rows[0] || []).length === 1 && titleMarkers.some(t => {
-    const cell = (rows[0][0] || '').trim().toLowerCase();
-    return cell && (cell === t.toLowerCase() || cell.startsWith(t.toLowerCase()));
-  });
-  const headerRowIndex = titleRowDetected ? 1 : 0;
-  if (rows.length <= headerRowIndex) { toast('CSVヘッダが不正です', false); return; }
-  const hdr = rows[headerRowIndex].map(s => s.trim());
-  const modernEn = ['group_index', 'group_title', 'member_order', 'id', 'name', 'ext', 'mobile', 'email', 'workHours', 'status', 'time', 'note'];
-  const modernJa = ['グループ番号', 'グループ名', '表示順', 'id', '氏名', '内線', '携帯番号', 'Email', '業務時間', 'ステータス', '戻り時間', '備考'];
-  const mustEn = ['group_index', 'group_title', 'member_order', 'id', 'name', 'ext', 'workHours', 'status', 'time', 'note'];
-  const mustJa = ['グループ番号', 'グループ名', '表示順', 'id', '氏名', '内線', '業務時間', 'ステータス', '戻り時間', '備考'];
-  const legacyEn = ['group_index', 'group_title', 'member_order', 'id', 'name', 'ext', 'status', 'time', 'note'];
-  const legacyJa = ['グループ番号', 'グループ名', '表示順', 'id', '氏名', '内線', 'ステータス', '戻り時間', '備考'];
-  const okModernEn = modernEn.every((h, i) => hdr[i] === h);
-  const okModernJa = modernJa.every((h, i) => hdr[i] === h);
-  const okEn = mustEn.every((h, i) => hdr[i] === h);
-  const okJa = mustJa.every((h, i) => hdr[i] === h);
-  const okLegacyEn = legacyEn.every((h, i) => hdr[i] === h);
-  const okLegacyJa = legacyJa.every((h, i) => hdr[i] === h);
-  if (!(okModernEn || okModernJa || okEn || okJa || okLegacyEn || okLegacyJa)) { toast('CSVヘッダが不正です', false); return; }
-  const hasWorkHoursColumn = okModernEn || okModernJa || okEn || okJa;
-  const hasContactColumn = okModernEn || okModernJa;
-  const keyOf = (gi, gt, mi, name, ext) => [String(gi), String(gt || ''), String(mi), String(name || ''), String(ext || '')].join('|');
+  const titleCell = (rows[0] && rows[0][0] != null) ? String(rows[0][0]) : '';
+  if (!((rows[0] || []).length === 1 && titleCell.trim() === '在席管理CSV')) { toast('CSVヘッダが不正です', false); return; }
+  if (rows.length < 2) { toast('CSVヘッダが不正です', false); return; }
+  const expectedHeader = ['グループ番号', 'グループ名', '表示順', 'id', '氏名', '内線', '携帯番号', 'Email', '業務時間', 'ステータス', '戻り時間', '備考'];
+  const hdr = (rows[1] || []).map(s => s.trim());
+  const headerOk = hdr.length === expectedHeader.length && expectedHeader.every((h, i) => hdr[i] === h);
+  if (!headerOk) { toast('CSVヘッダが不正です', false); return; }
 
-  const fallbackById = new Map();
-  const fallbackByKey = new Map();
-  if (!hasWorkHoursColumn) {
-    try {
-      const currentCfg = await adminGetConfigFor(office);
-      if (currentCfg && currentCfg.groups) {
-        (currentCfg.groups || []).forEach((g, gi0) => {
-          (g.members || []).forEach((m, mi0) => {
-            const val = m.workHours == null ? '' : String(m.workHours);
-            if (!val) return;
-            if (m.id) fallbackById.set(String(m.id), val);
-            fallbackByKey.set(keyOf(gi0 + 1, g.title || '', mi0 + 1, m.name || '', m.ext || ''), val);
-          });
-        });
-      }
-    } catch { }
+  const recs = [];
+  for (const r of rows.slice(2)) {
+    if (!r.some(x => (x || '').trim() !== '')) continue;
+    if (r.length !== expectedHeader.length) { toast('CSVデータ行が不正です', false); return; }
+    const [gi, gt, mi, id, name, ext, mobile, email, workHours, status, time, note] = r;
+    recs.push({
+      gi: Number(gi) || 0,
+      gt: (gt || ''),
+      mi: Number(mi) || 0,
+      id: (id || ''),
+      name: (name || ''),
+      ext: (ext || ''),
+      mobile: (mobile || ''),
+      email: (email || ''),
+      workHours: workHours == null ? '' : String(workHours),
+      status: (status || (STATUSES[0]?.value || '在席')),
+      time: (time || ''),
+      note: (note || '')
+    });
   }
 
-  const recs = rows.slice(headerRowIndex + 1).filter(r => r.some(x => (x || '').trim() !== '')).map(r => {
-    if (hasContactColumn) {
-      const [gi, gt, mi, id, name, ext, mobile, email, workHours, status, time, note] = r;
-      const workHoursValue = workHours == null ? '' : String(workHours);
-      return {
-        gi: Number(gi) || 0,
-        gt: (gt || ''),
-        mi: Number(mi) || 0,
-        id: (id || ''),
-        name: (name || ''),
-        ext: (ext || ''),
-        mobile: (mobile || ''),
-        email: (email || ''),
-        workHours: workHoursValue,
-        status: (status || (STATUSES[0]?.value || '在席')),
-        time: (time || ''),
-        note: (note || '')
-      };
-    } else if (hasWorkHoursColumn) {
-      const [gi, gt, mi, id, name, ext, workHours, status, time, note] = r;
-      const workHoursValue = workHours == null ? '' : String(workHours);
-      return {
-        gi: Number(gi) || 0,
-        gt: (gt || ''),
-        mi: Number(mi) || 0,
-        id: (id || ''),
-        name: (name || ''),
-        ext: (ext || ''),
-        mobile: '',
-        email: '',
-        workHours: workHoursValue,
-        status: (status || (STATUSES[0]?.value || '在席')),
-        time: (time || ''),
-        note: (note || '')
-      };
-    } else {
-      const [gi, gt, mi, id, name, ext, status, time, note] = r;
-      const key = keyOf(gi, gt, mi, name, ext || '');
-      const fallback = (id && fallbackById.get(id)) || fallbackByKey.get(key) || '';
-      const workHoursValue = fallback == null ? '' : String(fallback);
-      return {
-        gi: Number(gi) || 0,
-        gt: (gt || ''),
-        mi: Number(mi) || 0,
-        id: (id || ''),
-        name: (name || ''),
-        ext: (ext || ''),
-        mobile: '',
-        email: '',
-        workHours: workHoursValue,
-        status: (status || (STATUSES[0]?.value || '在席')),
-        time: (time || ''),
-        note: (note || '')
-      };
-    }
-  });
-
-  const idRe = (typeof ID_RE !== 'undefined') ? ID_RE : /^[0-9A-Za-z_-]+$/;
-  let invalidIdCount = 0;
   const groupsMap = new Map();
   for (const r of recs) {
     if (!r.gi || !r.mi || !r.name) continue;
     if (!groupsMap.has(r.gi)) groupsMap.set(r.gi, { title: r.gt || '', members: [] });
     const g = groupsMap.get(r.gi);
     g.title = r.gt || '';
-    let memberId = r.id || '';
-    if (memberId && !idRe.test(memberId)) {
-      invalidIdCount += 1;
-      memberId = '';
-    }
-    r.id = memberId;
+    const memberId = r.id || '';
     g.members.push({ _mi: r.mi, name: r.name, ext: r.ext || '', mobile: r.mobile || '', email: r.email || '', workHours: r.workHours || '', id: memberId || undefined });
   }
   const groups = Array.from(groupsMap.entries()).sort((a, b) => a[0] - b[0]).map(([gi, g]) => { g.members.sort((a, b) => (a._mi || 0) - (b._mi || 0)); g.members.forEach(m => delete m._mi); return g; });
-  if (invalidIdCount > 0) {
-    toast(`不正なIDが${invalidIdCount}件あり、自動生成IDに置換しました`, false);
-  }
   const cfgToSet = { version: 2, updated: Date.now(), groups, menus: MENUS || undefined };
   const r1 = await adminSetConfigFor(office, cfgToSet);
   if (!r1 || r1.error) {
@@ -177,15 +96,9 @@ btnImport.addEventListener('click', async () => {
     return;
   }
 
-  const newCfg = await adminGetConfigFor(office);
-  if (!(newCfg && newCfg.groups)) { toast('名簿再取得に失敗', false); return; }
-
-  const idIndex = new Map();
-  (newCfg.groups || []).forEach((g, gi0) => { (g.members || []).forEach((m, mi0) => { idIndex.set(keyOf(gi0 + 1, g.title || '', mi0 + 1, m.name || '', m.ext || ''), m.id); }); });
-
   const dataObj = {};
   for (const r of recs) {
-    const id = r.id || idIndex.get(keyOf(r.gi, r.gt, r.mi, r.name, r.ext || '')) || null;
+    const id = r.id || null;
     if (!id) continue;
     const workHours = r.workHours || '';
     dataObj[id] = { ext: r.ext || '', mobile: r.mobile || '', email: r.email || '', workHours, status: STATUSES.some(s => s.value === r.status) ? r.status : (STATUSES[0]?.value || '在席'), time: r.time || '', note: r.note || '' };
