@@ -46,7 +46,8 @@ btnImport.addEventListener('click', async ()=>{
   if(!file){ toast('CSVを選択してください',false); return; }
 
   const text=await file.text();
-  const rows=parseCSV(text);
+  const normalizedText=text.replace(/^\uFEFF/, '');
+  const rows=parseCSV(normalizedText);
   if(!rows.length){ toast('CSVが空です',false); return; }
   const titleMarkers=['在席管理CSV','whereabouts presence csv'];
   const titleRowDetected = (rows[0]||[]).length===1 && titleMarkers.some(t=>{
