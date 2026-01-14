@@ -19,8 +19,12 @@ function defaultMenus() {
     statuses: [
       { value: "在席", class: "st-here", clearOnSet: true },
       { value: "外出", requireTime: true, class: "st-out" },
-      { value: "会議", requireTime: true, class: "st-meeting" },
-      { value: "テレワーク", class: "st-remote", clearOnSet: true },
+      { value: "在宅勤務", class: "st-remote", clearOnSet: true },
+      { value: "出張", requireTime: true, class: "st-trip" },
+      { value: "研修", requireTime: true, class: "st-training" },
+      { value: "健康診断", requireTime: true, class: "st-health" },
+      { value: "コアドック", requireTime: true, class: "st-coadoc" },
+      { value: "帰宅", class: "st-home" },
       { value: "休み", class: "st-off", clearOnSet: true }
     ],
     noteOptions: ["直出", "直帰", "直出・直帰"],
