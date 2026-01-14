@@ -71,7 +71,8 @@ export default {
             status: f.status?.stringValue || '',
             time: f.time?.stringValue || '',
             note: f.note?.stringValue || '',
-            workHours: f.workHours?.stringValue || ''
+            workHours: f.workHours?.stringValue || '',
+            ext: f.ext?.stringValue || ''
           };
         });
 
