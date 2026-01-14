@@ -30,7 +30,7 @@ async function migrate() {
 
     const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     const members = raw.data || {};
-    const officeId = 'nagoya'; // 移行先オフィスID
+    const officeId = 'nagoya_chuo'; // 移行先オフィスID
 
     console.log(`Migrating ${Object.keys(members).length} members to office: ${officeId}...`);
 
