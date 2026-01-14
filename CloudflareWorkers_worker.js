@@ -136,6 +136,26 @@ export default {
         return new Response(JSON.stringify({ ok: true, updated: Date.now() }), { headers: corsHeaders });
       }
 
+      // 4. publicListOffices: 拠点一覧の取得
+      if (action === 'publicListOffices') {
+        const url = `${baseUrl}/offices`; // Firestoreのofficesコレクションを見に行く
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const json = await resp.json();
+
+        const offices = [];
+        if (json.documents) {
+          json.documents.forEach(doc => {
+            const id = doc.name.split('/').pop();
+            const fields = doc.fields || {};
+            offices.push({
+              id: id,
+              name: fields.name?.stringValue || id
+            });
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, offices: offices }), { headers: corsHeaders });
+      }
+
       return new Response(JSON.stringify({ error: 'unknown_action' }), { headers: corsHeaders });
 
     } catch (e) {
