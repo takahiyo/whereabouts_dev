@@ -255,6 +255,7 @@ export default {
               newIdCounter++;
               member.id = `mem_${nowTs}_${newIdCounter}_${randomSuffix()}`;
             }
+            member.id = member.id.replace(/\//g, '_');
           });
         });
 

@@ -169,12 +169,15 @@ btnImport.addEventListener('click', async () => {
   const newCfg = await adminGetConfigFor(office);
   if (!(newCfg && newCfg.groups)) { toast('名簿再取得に失敗', false); return; }
 
+  /* Sanitize Helper */
+  const sanitizeId = (id) => (id || '').replace(/\//g, '_');
+
   const idIndex = new Map();
-  (newCfg.groups || []).forEach((g, gi0) => { (g.members || []).forEach((m, mi0) => { idIndex.set(keyOf(gi0 + 1, g.title || '', mi0 + 1, m.name || '', m.ext || ''), m.id); }); });
+  (newCfg.groups || []).forEach((g, gi0) => { (g.members || []).forEach((m, mi0) => { idIndex.set(keyOf(gi0 + 1, g.title || '', mi0 + 1, m.name || '', m.ext || ''), sanitizeId(m.id)); }); });
 
   const dataObj = {};
   for (const r of recs) {
-    const id = r.id || idIndex.get(keyOf(r.gi, r.gt, r.mi, r.name, r.ext || '')) || null;
+    const id = r.id ? sanitizeId(r.id) : (idIndex.get(keyOf(r.gi, r.gt, r.mi, r.name, r.ext || '')) || null);
     if (!id) continue;
     const workHours = r.workHours || '';
     dataObj[id] = { ext: r.ext || '', mobile: r.mobile || '', email: r.email || '', workHours, status: STATUSES.some(s => s.value === r.status) ? r.status : (STATUSES[0]?.value || '在席'), time: r.time || '', note: r.note || '' };
