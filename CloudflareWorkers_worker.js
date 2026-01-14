@@ -82,7 +82,18 @@ export default {
           groupsMap[m.group].members.push(m);
         });
 
-        return new Response(JSON.stringify({ ok: true, config: { groups: Object.values(groupsMap) } }), { headers: corsHeaders });
+        const updatedCandidates = (json.documents || [])
+          .map(doc => doc.updateTime)
+          .filter(Boolean)
+          .map(v => Date.parse(v))
+          .filter(v => Number.isFinite(v));
+        const updated = updatedCandidates.length ? Math.max(...updatedCandidates) : Date.now();
+
+        return new Response(JSON.stringify({
+          ok: true,
+          groups: Object.values(groupsMap),
+          updated
+        }), { headers: corsHeaders });
       }
 
       // get: ステータスのみ取得

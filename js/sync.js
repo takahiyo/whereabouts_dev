@@ -169,10 +169,13 @@ async function fetchConfigOnce() {
   }
   if (cfg && !cfg.error) {
     const updated = (typeof cfg.updated === 'number') ? cfg.updated : 0;
-    if (updated && updated !== CONFIG_UPDATED) {
-      GROUPS = normalizeConfigClient(cfg);
-      CONFIG_UPDATED = updated;
-      setupMenus(cfg.menus || null);
+    const groups = cfg.groups || cfg.config?.groups || [];
+    const menus = cfg.menus || cfg.config?.menus || null;
+    const shouldUpdate = (updated && updated !== CONFIG_UPDATED) || (!updated && CONFIG_UPDATED === 0);
+    if (shouldUpdate) {
+      GROUPS = normalizeConfigClient({ groups });
+      CONFIG_UPDATED = updated || Date.now();
+      setupMenus(menus);
       render();
     }
   }
