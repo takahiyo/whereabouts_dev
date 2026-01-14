@@ -13,12 +13,13 @@ const PUBLIC_OFFICE_FALLBACKS = [];
 
 // Firebase Configuration
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyDRTr7h0diRJW6U1dQJaJgr303A5wm3aTE",
+    authDomain: "whereabouts-438df.firebaseapp.com",
+    projectId: "whereabouts-438df",
+    storageBucket: "whereabouts-438df.firebasestorage.app",
+    messagingSenderId: "955108979418",
+    appId: "1:955108979418:web:31a7235eeec873018dabe3",
+    measurementId: "G-26G0TS4HDW"
 };
 
 // Initialize Firebase
