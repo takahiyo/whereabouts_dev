@@ -98,6 +98,7 @@ export default {
         }
         return json;
       };
+      const BATCH_WRITE_SIZE = 200;
       const firestoreDelete = async (path) => {
         const url = `${baseUrl}/${path}`;
         const res = await fetch(url, {
@@ -355,7 +356,6 @@ export default {
         });
 
         // --- Fix: Batch writes to avoid subrequest limits ---
-        const BATCH_WRITE_SIZE = 200;
         for (let i = 0; i < memberWrites.length; i += BATCH_WRITE_SIZE) {
           await firestoreBatchWrite(memberWrites.slice(i, i + BATCH_WRITE_SIZE));
         }
@@ -384,6 +384,7 @@ export default {
         }
         const incomingData = incoming.data || {};
         const full = !!incoming.full;
+        const writes = [];
 
         if (full) {
           const existing = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
@@ -391,18 +392,22 @@ export default {
           const clears = (existing.documents || [])
             .map(doc => doc.name.split('/').pop())
             .filter(id => id && !incomingIds.has(id))
-            .map(id => firestorePatch(`offices/${officeId}/members/${encodeURIComponent(id)}`, {
-              fields: {
-                status: toFirestoreValue(''),
-                time: toFirestoreValue(''),
-                note: toFirestoreValue(''),
-                workHours: toFirestoreValue('')
-              }
-            }, ['status', 'time', 'note', 'workHours']));
-          await Promise.all(clears);
+            .map(id => ({
+              update: {
+                name: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/members/${encodeURIComponent(id)}`,
+                fields: {
+                  status: toFirestoreValue(''),
+                  time: toFirestoreValue(''),
+                  note: toFirestoreValue(''),
+                  workHours: toFirestoreValue('')
+                }
+              },
+              updateMask: { fieldPaths: ['status', 'time', 'note', 'workHours'] }
+            }));
+          writes.push(...clears);
         }
 
-        const updates = Object.keys(incomingData).map(async (userId) => {
+        Object.keys(incomingData).forEach((userId) => {
           const s = incomingData[userId] || {};
           const fields = {
             status: toFirestoreValue(s.status == null ? '' : String(s.status)),
@@ -418,13 +423,18 @@ export default {
             fields.ext = toFirestoreValue(s.ext == null ? '' : String(s.ext));
             updateMask.push('ext');
           }
-          return firestoreUpsert(`offices/${officeId}/members`,
-            userId,
-            { fields },
-            updateMask
-          );
+          writes.push({
+            update: {
+              name: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/members/${encodeURIComponent(userId)}`,
+              fields
+            },
+            updateMask: { fieldPaths: updateMask }
+          });
         });
-        await Promise.all(updates);
+
+        for (let i = 0; i < writes.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(writes.slice(i, i + BATCH_WRITE_SIZE));
+        }
         return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
 
