@@ -161,9 +161,13 @@ export default {
       if (action === 'getConfigFor') {
         const officeId = formData.get('office') || formData.get('tokenOffice') || 'nagoya_chuo';
         const cfgDoc = await firestoreFetchOptional(`offices/${officeId}/config`);
+        let cfgFromDoc = null;
         if (cfgDoc) {
-          const cfg = normalizeConfig(fromFirestoreDoc(cfgDoc));
-          return new Response(JSON.stringify(cfg), { headers: corsHeaders });
+          cfgFromDoc = normalizeConfig(fromFirestoreDoc(cfgDoc));
+          const hasMembers = (cfgFromDoc.groups || []).some(g => (g.members || []).length > 0);
+          if (hasMembers) {
+            return new Response(JSON.stringify(cfgFromDoc), { headers: corsHeaders });
+          }
         }
         const json = await firestoreFetch(`offices/${officeId}/members?pageSize=300`);
         const members = (json.documents || []).map(doc => {
@@ -196,8 +200,13 @@ export default {
           .filter(Boolean)
           .map(v => Date.parse(v))
           .filter(v => Number.isFinite(v));
-        const updated = updatedCandidates.length ? Math.max(...updatedCandidates) : Date.now();
-        const cfg = normalizeConfig({ groups: Object.values(groupsMap), updated });
+        const updatedFromMembers = updatedCandidates.length ? Math.max(...updatedCandidates) : Date.now();
+        const merged = {
+          groups: Object.values(groupsMap),
+          updated: cfgFromDoc ? Math.max(cfgFromDoc.updated || 0, updatedFromMembers) : updatedFromMembers,
+          menus: cfgFromDoc?.menus || undefined
+        };
+        const cfg = normalizeConfig(merged);
         return new Response(JSON.stringify(cfg), { headers: corsHeaders });
       }
 
