@@ -34,6 +34,9 @@ async function apiPost(params, timeout = 20000) {
   if (typeof CURRENT_OFFICE_ID !== 'undefined' && CURRENT_OFFICE_ID) {
     payload.tokenOffice = CURRENT_OFFICE_ID;
   }
+  if (typeof CURRENT_ROLE !== 'undefined' && CURRENT_ROLE) {
+    payload.tokenRole = CURRENT_ROLE;
+  }
   const controller = new AbortController(); const t = setTimeout(() => controller.abort(), timeout); try { const res = await fetch(REMOTE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: qsEncode(payload), signal: controller.signal, credentials: 'omit', cache: 'no-store' }); const ct = (res.headers.get('content-type') || '').toLowerCase(); if (!ct.includes('application/json')) return { ok: false, error: 'invalid_content_type' }; return await res.json(); } catch (err) { console.error(err); return { ok: false, error: err }; } finally { clearTimeout(t); }
 }
 /* セッションメタ(F5耐性) */

@@ -105,6 +105,9 @@ export default {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${accessToken}` }
         });
+        if (res.status === 404) {
+          return false;
+        }
         if (res.status !== 200) {
           const json = await res.json();
           throw new Error(`Firestore Error (${res.status}): ${JSON.stringify(json.error || json)}`);
@@ -480,15 +483,341 @@ export default {
         return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
 
+      const tokenOffice = formData.get('tokenOffice') || '';
+      const tokenRole = formData.get('tokenRole') || '';
+      const resolveOffice = (requestedOffice, fallbackOffice = 'nagoya_chuo') => {
+        let office = tokenOffice || requestedOffice || fallbackOffice;
+        if (requestedOffice && requestedOffice !== tokenOffice && canAdminOffice(tokenRole, tokenOffice, requestedOffice)) {
+          office = requestedOffice;
+        }
+        return office;
+      };
+
+      if (action === 'renameOffice') {
+        const officeId = formData.get('office') || tokenOffice || 'nagoya_chuo';
+        if (!canAdminOffice(tokenRole, tokenOffice, officeId)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        const name = (formData.get('name') || '').trim();
+        if (!name) {
+          return new Response(JSON.stringify({ error: 'bad_request' }), { headers: corsHeaders });
+        }
+        const officeDoc = await firestoreFetchOptional(`offices/${officeId}`);
+        if (!officeDoc) {
+          return new Response(JSON.stringify({ error: 'not_found' }), { headers: corsHeaders });
+        }
+        await firestorePatch(`offices/${officeId}`, {
+          fields: {
+            name: toFirestoreValue(name),
+            updated: toFirestoreValue(Date.now())
+          }
+        }, ['name', 'updated']);
+        return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+      }
+
+      if (action === 'setOfficePassword') {
+        const officeId = (formData.get('id') || tokenOffice || '').trim();
+        if (!officeId) {
+          return new Response(JSON.stringify({ error: 'bad_request' }), { headers: corsHeaders });
+        }
+        if (!canAdminOffice(tokenRole, tokenOffice, officeId)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        const pw = formData.get('password') || '';
+        const apw = formData.get('adminPassword') || '';
+        if (!pw && !apw) {
+          return new Response(JSON.stringify({ error: 'bad_request' }), { headers: corsHeaders });
+        }
+        const officeDoc = await firestoreFetchOptional(`offices/${officeId}`);
+        if (!officeDoc) {
+          return new Response(JSON.stringify({ error: 'not_found' }), { headers: corsHeaders });
+        }
+        const fields = { updated: toFirestoreValue(Date.now()) };
+        const updateMask = ['updated'];
+        if (pw) {
+          fields.password = toFirestoreValue(String(pw));
+          updateMask.push('password');
+        }
+        if (apw) {
+          fields.adminPassword = toFirestoreValue(String(apw));
+          updateMask.push('adminPassword');
+        }
+        await firestorePatch(`offices/${officeId}`, { fields }, updateMask);
+        return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+      }
+
       // getNotices: お知らせ取得
       if (action === 'getNotices') {
-        const officeId = formData.get('tokenOffice') || 'nagoya_chuo';
-        const json = await firestoreFetch(`offices/${officeId}/notices?pageSize=50`);
-        const notices = (json.documents || []).map(doc => {
-          const f = doc.fields || {};
-          return { id: doc.name.split('/').pop(), title: f.title?.stringValue || '', content: f.content?.stringValue || '' };
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        const json = await firestoreFetchOptional(`offices/${officeId}/notices?pageSize=${MAX_NOTICES_PER_OFFICE}`);
+        const normalized = normalizeNoticesArray((json?.documents || []).map(doc => ({
+          id: doc.name.split('/').pop(),
+          ...fromFirestoreDoc(doc)
+        })));
+        const isAdmin = roleIsOfficeAdmin(tokenRole);
+        const notices = isAdmin
+          ? normalized
+          : normalized.filter(n => coerceNoticeVisibleFlag(n.visible != null ? n.visible : (n.display != null ? n.display : true)));
+        return new Response(JSON.stringify({
+          ok: true,
+          notices,
+          updated: Date.now()
+        }), { headers: corsHeaders });
+      }
+
+      if (action === 'setNotices') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        if (!roleIsOfficeAdmin(tokenRole)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        if (requestedOffice && requestedOffice !== tokenOffice && !canAdminOffice(tokenRole, tokenOffice, requestedOffice)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        let parsedNotices;
+        try {
+          parsedNotices = JSON.parse(formData.get('notices') || '[]');
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'bad_json' }), { headers: corsHeaders });
+        }
+        const normalized = normalizeNoticesArray(parsedNotices);
+        const nowTs = Date.now();
+        const desiredIds = new Set();
+        const writes = [];
+        normalized.forEach((notice, idx) => {
+          const id = String(notice.id || `notice_${nowTs}_${idx + 1}`);
+          desiredIds.add(id);
+          const fields = {
+            title: toFirestoreValue(notice.title || ''),
+            content: toFirestoreValue(notice.content || ''),
+            visible: toFirestoreValue(coerceNoticeVisibleFlag(notice.visible != null ? notice.visible : notice.display)),
+            order: toFirestoreValue(Number(notice.order || (idx + 1))),
+            updated: toFirestoreValue(nowTs)
+          };
+          writes.push({
+            update: {
+              name: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/notices/${encodeURIComponent(id)}`,
+              fields
+            },
+            updateMask: { fieldPaths: ['title', 'content', 'visible', 'order', 'updated'] }
+          });
         });
-        return new Response(JSON.stringify({ ok: true, notices }), { headers: corsHeaders });
+        for (let i = 0; i < writes.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(writes.slice(i, i + BATCH_WRITE_SIZE));
+        }
+        const existing = await firestoreFetchOptional(`offices/${officeId}/notices?pageSize=${MAX_NOTICES_PER_OFFICE}`);
+        const deletions = (existing?.documents || [])
+          .map(doc => doc.name.split('/').pop())
+          .filter(id => id && !desiredIds.has(id))
+          .map(id => ({
+            delete: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/notices/${encodeURIComponent(id)}`
+          }));
+        for (let i = 0; i < deletions.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(deletions.slice(i, i + BATCH_WRITE_SIZE));
+        }
+        return new Response(JSON.stringify({ ok: true, notices: normalized, updated: nowTs }), { headers: corsHeaders });
+      }
+
+      if (action === 'getTools') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        const toolsDoc = await firestoreFetchOptional(`offices/${officeId}/tools/config`);
+        const stored = toolsDoc ? fromFirestoreDoc(toolsDoc) : {};
+        const normalized = normalizeToolsArray(stored.tools || []);
+        const isAdmin = roleIsOfficeAdmin(tokenRole);
+        const tools = isAdmin ? normalized.list : filterVisibleTools(normalized.list);
+        return new Response(JSON.stringify({
+          tools,
+          warnings: normalized.warnings,
+          updated: Number(stored.updated || 0) || Date.now()
+        }), { headers: corsHeaders });
+      }
+
+      if (action === 'setTools') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        if (!roleIsOfficeAdmin(tokenRole)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        if (requestedOffice && requestedOffice !== tokenOffice && !canAdminOffice(tokenRole, tokenOffice, requestedOffice)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        let parsedTools;
+        try {
+          parsedTools = JSON.parse(formData.get('tools') || '[]');
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'bad_json' }), { headers: corsHeaders });
+        }
+        const normalized = normalizeToolsArray(parsedTools);
+        const nowTs = Date.now();
+        await firestoreUpsert(`offices/${officeId}/tools`, 'config', {
+          fields: {
+            tools: toFirestoreValue(normalized.list),
+            updated: toFirestoreValue(nowTs)
+          }
+        });
+        return new Response(JSON.stringify({ ok: true, tools: normalized.list, warnings: normalized.warnings, updated: nowTs }), { headers: corsHeaders });
+      }
+
+      if (action === 'getEventColorMap') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        const colorDoc = await firestoreFetchOptional(`offices/${officeId}/eventColors/config`);
+        const stored = colorDoc ? fromFirestoreDoc(colorDoc) : {};
+        const normalized = normalizeEventColorMap(stored);
+        if (!normalized.updated) {
+          normalized.updated = Date.now();
+        }
+        return new Response(JSON.stringify(normalized), { headers: corsHeaders });
+      }
+
+      if (action === 'setEventColorMap') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        if (!roleIsOfficeAdmin(tokenRole)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        if (requestedOffice && requestedOffice !== tokenOffice && !canAdminOffice(tokenRole, tokenOffice, requestedOffice)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        let payload;
+        try {
+          payload = JSON.parse(formData.get('data') || '{}') || {};
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'bad_json' }), { headers: corsHeaders });
+        }
+        const normalized = normalizeEventColorMap(payload);
+        const nowTs = Date.now();
+        await firestoreUpsert(`offices/${officeId}/eventColors`, 'config', {
+          fields: {
+            colors: toFirestoreValue(normalized.colors || {}),
+            updated: toFirestoreValue(nowTs)
+          }
+        });
+        return new Response(JSON.stringify({ ok: true, colors: normalized.colors || {}, updated: nowTs }), { headers: corsHeaders });
+      }
+
+      if (action === 'getVacation') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        const json = await firestoreFetchOptional(`offices/${officeId}/vacations?pageSize=200`);
+        let vacations = (json?.documents || []).map(doc => normalizeVacationItem({
+          id: doc.name.split('/').pop(),
+          ...fromFirestoreDoc(doc)
+        }, officeId)).filter(Boolean);
+        vacations = vacations.map((v, idx) => {
+          const orderVal = Number(v.order || 0);
+          return { ...v, order: orderVal > 0 ? orderVal : (idx + 1) };
+        }).sort((a, b) => {
+          const ao = Number(a.order || 0);
+          const bo = Number(b.order || 0);
+          if (ao !== bo) return ao - bo;
+          return Number(a.updated || 0) - Number(b.updated || 0);
+        });
+        return new Response(JSON.stringify({ vacations, updated: Date.now() }), { headers: corsHeaders });
+      }
+
+      if (action === 'setVacation') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        if (!roleIsOfficeAdmin(tokenRole)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        if (requestedOffice && requestedOffice !== tokenOffice && !canAdminOffice(tokenRole, tokenOffice, requestedOffice)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        let payload;
+        try {
+          payload = JSON.parse(formData.get('data') || '{}') || {};
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'bad_json' }), { headers: corsHeaders });
+        }
+        const json = await firestoreFetchOptional(`offices/${officeId}/vacations?pageSize=200`);
+        let vacations = (json?.documents || []).map(doc => normalizeVacationItem({
+          id: doc.name.split('/').pop(),
+          ...fromFirestoreDoc(doc)
+        }, officeId)).filter(Boolean);
+
+        const id = payload.id || payload.vacationId || (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : `vac_${Date.now()}`);
+        const title = String(payload.title || '').substring(0, 200);
+        const startDate = String(payload.start || payload.startDate || '').trim();
+        const endDate = String(payload.end || payload.endDate || '').trim();
+        const noticeId = String(payload.noticeId || payload.noticeKey || '').substring(0, 200);
+        const noticeTitle = String(payload.noticeTitle || '').substring(0, 200);
+        const note = String(payload.note || noticeTitle || '').substring(0, 2000);
+        const membersBits = String(payload.membersBits || '').trim();
+        const visible = coerceVacationVisibleFlag(payload.visible);
+        const isVacation = coerceVacationTypeFlag(payload.isVacation);
+        const color = String(payload.color || payload.eventColor || 'amber').trim() || 'amber';
+        const orderRaw = Number(payload.order || payload.sortOrder || 0);
+        const hasOrder = Number.isFinite(orderRaw) && orderRaw > 0;
+        const base = { id, office: officeId, title, startDate, endDate, note, noticeId, noticeTitle, membersBits, visible, isVacation, color, updated: Date.now() };
+        if (hasOrder) {
+          base.order = orderRaw;
+        }
+        const newItem = normalizeVacationItem(base, officeId);
+        const existingIndex = vacations.findIndex(v => v.id === id);
+        if (existingIndex >= 0) {
+          vacations[existingIndex] = newItem;
+        } else {
+          vacations.push(newItem);
+        }
+
+        vacations = vacations.map((v, idx) => {
+          const orderVal = Number(v.order || 0);
+          return { ...v, order: orderVal > 0 ? orderVal : (idx + 1) };
+        }).sort((a, b) => {
+          const ao = Number(a.order || 0);
+          const bo = Number(b.order || 0);
+          if (ao !== bo) return ao - bo;
+          return Number(a.updated || 0) - Number(b.updated || 0);
+        }).map((v, idx) => normalizeVacationItem({ ...v, order: Number(v.order || 0) || (idx + 1) }, officeId));
+
+        const writes = vacations.map(v => ({
+          update: {
+            name: `projects/${projectId}/databases/(default)/documents/offices/${officeId}/vacations/${encodeURIComponent(v.id)}`,
+            fields: {
+              title: toFirestoreValue(v.title || ''),
+              startDate: toFirestoreValue(v.startDate || ''),
+              endDate: toFirestoreValue(v.endDate || ''),
+              office: toFirestoreValue(v.office || officeId),
+              noticeId: toFirestoreValue(v.noticeId || ''),
+              noticeTitle: toFirestoreValue(v.noticeTitle || ''),
+              note: toFirestoreValue(v.note || ''),
+              membersBits: toFirestoreValue(v.membersBits || ''),
+              visible: toFirestoreValue(v.visible === true),
+              isVacation: toFirestoreValue(v.isVacation !== false),
+              color: toFirestoreValue(v.color || 'amber'),
+              order: toFirestoreValue(Number(v.order || 0)),
+              updated: toFirestoreValue(Number(v.updated || 0) || Date.now())
+            }
+          },
+          updateMask: { fieldPaths: ['title', 'startDate', 'endDate', 'office', 'noticeId', 'noticeTitle', 'note', 'membersBits', 'visible', 'isVacation', 'color', 'order', 'updated'] }
+        }));
+        for (let i = 0; i < writes.length; i += BATCH_WRITE_SIZE) {
+          await firestoreBatchWrite(writes.slice(i, i + BATCH_WRITE_SIZE));
+        }
+
+        const savedItem = vacations.find(v => v.id === id) || newItem;
+        return new Response(JSON.stringify({ ok: true, id, vacation: savedItem, vacations }), { headers: corsHeaders });
+      }
+
+      if (action === 'deleteVacation') {
+        const requestedOffice = formData.get('office') || '';
+        const officeId = resolveOffice(requestedOffice);
+        if (!roleIsOfficeAdmin(tokenRole)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        if (requestedOffice && requestedOffice !== tokenOffice && !canAdminOffice(tokenRole, tokenOffice, requestedOffice)) {
+          return new Response(JSON.stringify({ error: 'forbidden' }), { headers: corsHeaders });
+        }
+        const id = (formData.get('id') || '').trim();
+        if (!id) {
+          return new Response(JSON.stringify({ error: 'bad_request' }), { headers: corsHeaders });
+        }
+        await firestoreDelete(`offices/${officeId}/vacations/${encodeURIComponent(id)}`);
+        return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
 
       // publicListOffices: 拠点一覧
@@ -633,4 +962,314 @@ function toFirestoreValue(value) {
     return { mapValue: { fields } };
   }
   return { stringValue: String(value) };
+}
+
+const MAX_NOTICES_PER_OFFICE = 100;
+const MAX_EVENT_COLOR_ENTRIES = 400;
+const MAX_TOOLS_PER_OFFICE = 300;
+const EVENT_COLOR_KEYS = ['amber', 'blue', 'green', 'pink', 'purple', 'teal', 'gray'];
+
+function roleIsOfficeAdmin(role) {
+  return role === 'officeAdmin' || role === 'superAdmin';
+}
+
+function canAdminOffice(role, tokenOffice, office) {
+  if (role === 'superAdmin') return true;
+  return role === 'officeAdmin' && tokenOffice === office;
+}
+
+function coerceNoticeArray(src) {
+  if (src == null) return [];
+  if (Array.isArray(src)) return src;
+  if (typeof src === 'string') {
+    const trimmed = src.trim();
+    if (!trimmed) return [];
+    if (trimmed[0] === '[' || trimmed[0] === '{') {
+      try { return coerceNoticeArray(JSON.parse(trimmed)); } catch (_) { }
+    }
+    return [trimmed];
+  }
+  if (typeof src === 'object') {
+    if (Array.isArray(src.list)) return src.list;
+    if (Array.isArray(src.items)) return src.items;
+    return Object.keys(src).sort().map(k => src[k]).filter(v => v != null);
+  }
+  return [];
+}
+
+function coerceNoticeVisibleFlag(raw) {
+  if (raw === false) return false;
+  if (raw === true || raw == null) return true;
+  const s = String(raw).toLowerCase();
+  return !(s === 'false' || s === '0' || s === 'off' || s === 'no' || s === 'hide');
+}
+
+function normalizeNoticeItem(raw) {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    if (!text) return null;
+    return { title: text.substring(0, 200), content: '', display: true, visible: true };
+  }
+  if (Array.isArray(raw)) {
+    const title = raw[0] == null ? '' : String(raw[0]).substring(0, 200);
+    const content = raw[1] == null ? '' : String(raw[1]).substring(0, 2000);
+    if (!title.trim() && !content.trim()) return null;
+    return { title, content, display: true, visible: true };
+  }
+  if (typeof raw !== 'object') return null;
+  const id = raw.id != null ? raw.id : (raw.noticeId != null ? raw.noticeId : (raw.uid != null ? raw.uid : undefined));
+  const titleSrc = raw.title != null ? raw.title : (raw.subject != null ? raw.subject : raw.headline);
+  const contentSrc = raw.content != null ? raw.content : (raw.body != null ? raw.body : (raw.text != null ? raw.text : raw.description));
+  const title = titleSrc == null ? '' : String(titleSrc).substring(0, 200);
+  const content = contentSrc == null ? '' : String(contentSrc).substring(0, 2000);
+  const visible = coerceNoticeVisibleFlag(raw.visible != null ? raw.visible : (raw.display != null ? raw.display : (raw.show != null ? raw.show : true)));
+  if (!title.trim() && !content.trim()) return null;
+  const result = { title, content, display: visible, visible: visible };
+  if (id != null) result.id = id;
+  if (raw.order != null) result.order = Number(raw.order || 0);
+  return result;
+}
+
+function normalizeNoticesArray(raw) {
+  const arr = coerceNoticeArray(raw);
+  const normalized = arr.map(normalizeNoticeItem).filter(Boolean);
+  if (normalized.length > MAX_NOTICES_PER_OFFICE) {
+    return normalized.slice(0, MAX_NOTICES_PER_OFFICE);
+  }
+  return normalized;
+}
+
+function coerceToolArray(raw) {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (trimmed[0] === '[' || trimmed[0] === '{') {
+      try { return coerceToolArray(JSON.parse(trimmed)); } catch (_) { }
+    }
+    return [trimmed];
+  }
+  if (typeof raw === 'object') {
+    if (Array.isArray(raw.list)) return raw.list;
+    if (Array.isArray(raw.items)) return raw.items;
+    return Object.keys(raw).sort().map(k => raw[k]).filter(v => v != null);
+  }
+  return [];
+}
+
+function coerceToolVisibleFlag(raw) {
+  if (raw === true || raw == null) return true;
+  if (raw === false) return false;
+  const s = String(raw).trim().toLowerCase();
+  return !(s === 'false' || s === '0' || s === 'off' || s === 'no' || s === 'hide');
+}
+
+function ensureUniqueToolId(ctx, preferred) {
+  let base = (preferred == null ? '' : String(preferred)).trim();
+  if (!base) { base = `tool_${ctx.seq}`; ctx.seq += 1; }
+  let id = base;
+  let i = 1;
+  while (ctx.seen.has(id)) {
+    id = `${base}_${i}`;
+    i += 1;
+  }
+  ctx.seen.add(id);
+  return id;
+}
+
+function normalizeToolItem(raw, ctx, parentId) {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    if (!text) return null;
+    const id = ensureUniqueToolId(ctx, `tool_${ctx.seq}`);
+    return { id, title: text, url: '', note: '', visible: true, display: true, parentId: parentId || '', children: [] };
+  }
+  if (typeof raw !== 'object') return null;
+
+  const idRaw = raw.id ?? raw.toolId ?? raw.key;
+  const id = ensureUniqueToolId(ctx, idRaw);
+  const titleSrc = raw.title ?? raw.name ?? raw.label ?? '';
+  const urlSrc = raw.url ?? raw.link ?? '';
+  const noteSrc = raw.note ?? raw.memo ?? raw.remark ?? '';
+  const visible = coerceToolVisibleFlag(raw.visible ?? raw.display ?? raw.show ?? true);
+  const parentSrc = raw.parentId != null ? String(raw.parentId) : '';
+  const titleStr = String(titleSrc || '').trim();
+  const urlStr = String(urlSrc || '').trim();
+  const noteStr = String(noteSrc || '').trim();
+  const parent = parentSrc.trim() || parentId || '';
+  const node = {
+    id,
+    title: titleStr || urlStr || id,
+    url: urlStr,
+    note: noteStr,
+    visible,
+    display: visible,
+    parentId: parent,
+    children: []
+  };
+  const childrenRaw = coerceToolArray(raw.children ?? raw.items ?? []);
+  childrenRaw.forEach(child => {
+    const c = normalizeToolItem(child, ctx, id);
+    if (c) { ctx.nodes.push(c); }
+  });
+  return node;
+}
+
+function normalizeToolsArray(raw) {
+  const arr = coerceToolArray(raw);
+  const ctx = { seq: 0, seen: new Set(), nodes: [], warnings: [] };
+
+  arr.forEach(item => {
+    const n = normalizeToolItem(item, ctx, '');
+    if (n) { ctx.nodes.push(n); }
+  });
+
+  const filtered = ctx.nodes.filter(n => n && (n.title || n.url || n.note));
+  const map = new Map();
+  filtered.forEach(n => { n.children = []; map.set(n.id, n); });
+
+  filtered.forEach(n => {
+    let pid = n.parentId || '';
+    if (pid && (!map.has(pid) || pid === n.id)) {
+      if (pid === n.id) { ctx.warnings.push(`ツール ${n.id} が自身を親にしていたためルートに移動しました`); }
+      if (!map.has(pid)) { ctx.warnings.push(`ツール ${n.id} の親 ${pid} が存在しないためルートに移動しました`); }
+      pid = '';
+    }
+    n.parentId = pid;
+  });
+
+  filtered.forEach(n => {
+    const visited = new Set();
+    let pid = n.parentId;
+    while (pid) {
+      if (visited.has(pid)) {
+        ctx.warnings.push(`ツール ${n.id} の親子関係に循環が見つかったためルートに移動しました`);
+        n.parentId = '';
+        break;
+      }
+      visited.add(pid);
+      const p = map.get(pid);
+      if (!p) { n.parentId = ''; break; }
+      pid = p.parentId;
+    }
+  });
+
+  filtered.forEach(n => {
+    if (n.parentId && map.has(n.parentId)) {
+      map.get(n.parentId).children.push(n);
+    }
+  });
+
+  const roots = filtered.filter(n => !n.parentId);
+  let count = 0;
+  function prune(list) {
+    const out = [];
+    list.forEach(item => {
+      if (count >= MAX_TOOLS_PER_OFFICE) { return; }
+      count += 1;
+      if (item.children && item.children.length) {
+        item.children = prune(item.children);
+      }
+      out.push(item);
+    });
+    return out;
+  }
+  const pruned = prune(roots);
+  if (count < filtered.length) {
+    ctx.warnings.push(`ツールが${MAX_TOOLS_PER_OFFICE}件を超えたため、超過分を省略しました`);
+  }
+  return { list: pruned, warnings: ctx.warnings };
+}
+
+function filterVisibleTools(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  list.forEach(item => {
+    if (!item) return;
+    const visible = coerceToolVisibleFlag(item.visible != null ? item.visible : (item.display != null ? item.display : true));
+    if (!visible) return;
+    const copy = Object.assign({}, item);
+    copy.children = filterVisibleTools(item.children || []);
+    out.push(copy);
+  });
+  return out;
+}
+
+function coerceVacationVisibleFlag(raw) {
+  if (raw === true) return true;
+  if (raw === false) return false;
+  if (typeof raw === 'number') return raw !== 0;
+  if (typeof raw === 'string') {
+    const s = raw.trim().toLowerCase();
+    if (!s) return false;
+    return !(s === 'false' || s === '0' || s === 'off' || s === 'no' || s === 'hide');
+  }
+  return false;
+}
+
+function coerceVacationTypeFlag(raw) {
+  if (raw === true) return true;
+  if (raw === false) return false;
+  if (typeof raw === 'string') {
+    const s = raw.trim().toLowerCase();
+    if (!s) return true;
+    return !(s === 'false' || s === '0' || s === 'off' || s === 'no' || s === 'hide');
+  }
+  if (typeof raw === 'number') return raw !== 0;
+  return true;
+}
+
+function normalizeDateStr(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function normalizeEventColorKey(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  return EVENT_COLOR_KEYS.includes(s) ? s : '';
+}
+
+function normalizeEventColorMap(raw) {
+  const source = (raw && typeof raw === 'object' && raw.colors && typeof raw.colors === 'object')
+    ? raw.colors
+    : (raw && typeof raw === 'object' ? raw : {});
+  const out = { colors: {}, updated: Number(raw && raw.updated || 0) || 0 };
+  Object.keys(source || {}).sort().slice(0, MAX_EVENT_COLOR_ENTRIES).forEach(date => {
+    const normalizedDate = normalizeDateStr(date);
+    const colorKey = normalizeEventColorKey(source[date]);
+    if (normalizedDate && colorKey) {
+      out.colors[normalizedDate] = colorKey;
+    }
+  });
+  if (!out.updated) {
+    out.updated = Date.now();
+  }
+  return out;
+}
+
+function normalizeVacationItem(raw, office) {
+  if (raw == null) return null;
+  const id = String(raw.id || raw.vacationId || '').trim();
+  const title = String(raw.title || raw.subject || '').substring(0, 200);
+  const startDate = String(raw.startDate || raw.start || raw.from || '').trim();
+  const endDate = String(raw.endDate || raw.end || raw.to || '').trim();
+  const noticeId = String(raw.noticeId || raw.noticeKey || '').trim();
+  const noticeTitle = String(raw.noticeTitle || '').substring(0, 200);
+  const note = String(raw.note || raw.memo || noticeTitle || '').substring(0, 2000);
+  const membersBits = String(raw.membersBits || raw.bits || '').trim();
+  const visible = coerceVacationVisibleFlag(raw.visible);
+  const isVacation = coerceVacationTypeFlag(raw.isVacation);
+  const color = String(raw.color || raw.eventColor || 'amber').trim() || 'amber';
+  const orderRaw = Number(raw.order || raw.sortOrder || raw.position || 0);
+  const order = Number.isFinite(orderRaw) && orderRaw > 0 ? orderRaw : 0;
+  const updated = Number(raw.updated || raw.serverUpdated || 0) || Date.now();
+  return { id, office: String(raw.office || office || ''), title, startDate, endDate, note, noticeId, noticeTitle, membersBits, updated, visible, isVacation, color, order };
 }
