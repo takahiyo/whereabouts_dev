@@ -3,7 +3,7 @@
 // REMOTE_POLL_MS: 状態更新のポーリング間隔(ms)
 // CONFIG_POLL_MS: 設定更新のポーリング間隔(ms)
 // TOKEN_DEFAULT_TTL: トークンのデフォルト有効期限(ms)
-const REMOTE_ENDPOINT = "https://presence-proxy-test.taka-hiyo.workers.dev";
+const REMOTE_ENDPOINT = "https://presence-proxy-prod.taka-hiyo.workers.dev";
 const REMOTE_POLL_MS = 10000;
 const CONFIG_POLL_MS = 30000;
 const TOKEN_DEFAULT_TTL = 3600000;

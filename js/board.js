@@ -352,7 +352,7 @@ function render() {
   board.style.display = '';
   // 自己修復
   board.querySelectorAll('tbody tr').forEach(ensureRowControls);
-  wireEvents(); loadLocal(); recolor();
+  wireEvents(); recolor();
   try {
     startGridObserver();
   } catch (e) {
@@ -477,8 +477,8 @@ function ensureTimePrompt(tr) {
 
 /* ローカル保存 */
 function localKey() { return `${storeKeyBase}:${CURRENT_OFFICE_ID || '__none__'}:${CONFIG_UPDATED || 0}`; }
-function saveLocal() { try { localStorage.setItem(localKey(), JSON.stringify(getState())); } catch { } }
-function loadLocal() { try { const raw = localStorage.getItem(localKey()); if (raw) applyState(JSON.parse(raw)); } catch { } }
+function saveLocal() { }
+function loadLocal() { }
 
 /* 同期（行ごとデバウンス送信） */
 const rowTimers = new Map();
