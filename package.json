@@ -1,0 +1,12 @@
+{
+  "name": "whereabouts-migration",
+  "version": "1.0.0",
+  "description": "Migration scripts for Whereabouts",
+  "main": "migrate.js",
+  "scripts": {
+    "migrate": "node migrate.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.1"
+  }
+}

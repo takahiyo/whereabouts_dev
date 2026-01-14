@@ -10,3 +10,18 @@ const TOKEN_DEFAULT_TTL = 3600000;
 
 // publicListOffices が利用できない環境で使用する拠点一覧（id, name）
 const PUBLIC_OFFICE_FALLBACKS = [];
+
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase
+if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+}
