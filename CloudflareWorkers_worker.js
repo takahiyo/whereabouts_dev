@@ -156,6 +156,71 @@ export default {
         return new Response(JSON.stringify({ ok: true, offices: offices }), { headers: corsHeaders });
       }
 
+      // 5. getConfig: 名簿構造（グループ・メンバー一覧）の取得
+      if (action === 'getConfig') {
+        const officeId = formData.get('tokenOffice') || 'nagoya_chuo';
+        // Firestoreのmembersコレクションから全メンバーを取得（表示順でソート）
+        const url = `${baseUrl}/offices/${officeId}/members?pageSize=300`;
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const json = await resp.json();
+
+        const members = [];
+        if (json.documents) {
+          json.documents.forEach(doc => {
+            const id = doc.name.split('/').pop();
+            const f = doc.fields || {};
+            members.push({
+              id: id,
+              name: f.name?.stringValue || '',
+              group: f.group?.stringValue || '',
+              order: Number(f.order?.integerValue || f.order?.doubleValue || 0),
+              ext: f.ext?.stringValue || '',
+              mobile: f.mobile?.stringValue || '',
+              email: f.email?.stringValue || '',
+              workHours: f.workHours?.stringValue || '',
+              status: f.status?.stringValue || '',
+              time: f.time?.stringValue || '',
+              note: f.note?.stringValue || ''
+            });
+          });
+        }
+
+        // グループごとにまとめる処理（フロントエンドが期待する形式に変換）
+        const groupsMap = {};
+        members.sort((a, b) => a.order - b.order).forEach(m => {
+          if (!groupsMap[m.group]) groupsMap[m.group] = { title: m.group, members: [] };
+          groupsMap[m.group].members.push(m);
+        });
+
+        return new Response(JSON.stringify({
+          ok: true,
+          config: { groups: Object.values(groupsMap) },
+          updated: Date.now()
+        }), { headers: corsHeaders });
+      }
+
+      // 6. getNotices: お知らせ一覧の取得
+      if (action === 'getNotices') {
+        const officeId = formData.get('tokenOffice') || 'nagoya_chuo';
+        const url = `${baseUrl}/offices/${officeId}/notices?pageSize=50`;
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const json = await resp.json();
+
+        const notices = [];
+        if (json.documents) {
+          json.documents.forEach(doc => {
+            const f = doc.fields || {};
+            notices.push({
+              id: doc.name.split('/').pop(),
+              title: f.title?.stringValue || '',
+              content: f.content?.stringValue || '',
+              updatedAt: f.updatedAt?.timestampValue || ''
+            });
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, notices: notices }), { headers: corsHeaders });
+      }
+
       return new Response(JSON.stringify({ error: 'unknown_action' }), { headers: corsHeaders });
 
     } catch (e) {
