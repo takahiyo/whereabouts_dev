@@ -66,10 +66,10 @@ npx wrangler secret put GAS_ENDPOINT
 **ファイル**: `config.js`
 
 ```javascript
-// 変更前（開発環境）
+// テスト環境（現在の設定）
 const REMOTE_ENDPOINT = "https://presence-proxy-test.taka-hiyo.workers.dev";
 
-// 変更後（本番環境）
+// 本番環境へ切替する場合
 const REMOTE_ENDPOINT = "https://presence-proxy.taka-hiyo.workers.dev";
 // または
 const REMOTE_ENDPOINT = "https://presence-proxy-prod.taka-hiyo.workers.dev";
@@ -87,12 +87,14 @@ const REMOTE_ENDPOINT = "https://presence-proxy-prod.taka-hiyo.workers.dev";
 **検索キーワード**: `connect-src`
 
 ```html
-<!-- 変更前（開発環境） -->
+<!-- テスト環境（現在の設定） -->
 connect-src 'self' https://presence-proxy-test.taka-hiyo.workers.dev;
 
-<!-- 変更後（本番環境） -->
+<!-- 本番環境へ切替する場合 -->
 connect-src 'self' https://presence-proxy.taka-hiyo.workers.dev;
 ```
+
+**注意**: `config.js` の `REMOTE_ENDPOINT` と同じ Worker URL が `connect-src` に含まれていることを確認してください。
 
 #### 3-2. タイトル・表示文言の変更（4箇所）
 
