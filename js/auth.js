@@ -74,17 +74,26 @@ async function login(officeInput, passwordInput) {
       throw new Error("認証に失敗しました。オフィスIDまたはパスワードを確認してください。");
     }
 
-    // 2. 成功したらFirebaseに匿名ログイン (DBアクセス権確保のため)
+    // ★重要：Firebaseにログインする「前」に、拠点情報を保存する
+    // これにより、ログイン直後に走る監視役が正しく情報を読み取れます
+    localStorage.setItem('presence_office', result.office);
+    localStorage.setItem('presence_role', result.role);
+    localStorage.setItem('presence_office_name', result.officeName || result.office);
+
+    // 2. Firebaseに匿名ログイン
     await firebase.auth().signInAnonymously();
 
-    // 3. セッション情報を保存
+    // 3. グローバル変数を更新
+    SESSION_TOKEN = 'firebase_session';
     CURRENT_OFFICE_ID = result.office;
     CURRENT_OFFICE_NAME = result.officeName || result.office;
     CURRENT_ROLE = result.role;
-    localStorage.setItem('presence_office', result.office);
-    localStorage.setItem('presence_role', result.role);
 
     toast(`ログインしました: ${result.officeName}`);
+
+    // UIを即座に表示状態に切り替える
+    updateAuthUI();
+
     return true;
 
   } catch (error) {
