@@ -1452,7 +1452,8 @@ function parseCSV(text) {
       else field += c;
     }
   }
-  if (field !== '') pushField();
+  const endsWithComma = text.length > 0 && text[text.length - 1] === ',';
+  if (field !== '' || endsWithComma) pushField();
   if (row.length) pushRow();
   return out;
 }
