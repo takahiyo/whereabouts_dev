@@ -251,7 +251,7 @@ export default {
           groups: toFirestoreValue(parsed.groups || []),
           menus: toFirestoreValue(parsed.menus || {})
         };
-        await firestorePatch(`offices/${officeId}/config`, { fields: configFields });
+        await firestoreUpsert(`offices/${officeId}`, 'config', { fields: configFields });
 
         const desiredIds = new Set();
         let order = 0;
