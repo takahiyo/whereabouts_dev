@@ -1332,7 +1332,7 @@
 
   .member-table th:nth-child(1),
   .member-table td:nth-child(1) {
-    width: 190px;
+    width: 230px;
     white-space: nowrap;
     text-align: center;
   }
@@ -1346,7 +1346,7 @@
 
   .member-table th:nth-child(4),
   .member-table td:nth-child(4) {
-    width: 60px;
+    width: 20px;
   }
 
   .member-table th:nth-child(5),
