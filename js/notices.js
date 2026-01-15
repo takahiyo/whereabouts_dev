@@ -341,30 +341,54 @@ async function saveNotices(notices, office) {
   return false;
 }
 
-// お知らせの自動更新（ポーリング）
+// お知らせの自動更新（ポーリング -> Firestore Listener）
 let noticesPollingTimer = null;
 
 function startNoticesPolling() {
+  // すでにSDKリスナーが動いていれば何もしない
+  if (window.noticesUnsubscribe) return;
+
+  const db = (typeof firebase !== 'undefined' && firebase.apps.length) ? firebase.firestore() : null;
+  
+  // Plan A: SDKが使えるならリスナー登録
+  if (db && CURRENT_OFFICE_ID) {
+    console.log('Notices: Starting Firestore listener (Plan A)');
+    const colRef = db.collection('offices').doc(CURRENT_OFFICE_ID).collection('notices');
+    
+    // リアルタイム監視開始
+    window.noticesUnsubscribe = colRef.onSnapshot((snapshot) => {
+      const notices = [];
+      snapshot.forEach(doc => {
+        notices.push({ id: doc.id, ...doc.data() });
+      });
+      // 既存の描画関数を再利用
+      // ※Firestoreのデータは正規化済み前提だが、念のため applyNotices を通す
+      applyNotices(notices); 
+    }, (error) => {
+      console.warn('Notices listener failed, falling back to polling:', error);
+      startLegacyNoticesPolling(); // 失敗時のみPlan Bへ
+    });
+  } else {
+    // Plan B: SDK不可なら従来のポーリング
+    startLegacyNoticesPolling();
+  }
+}
+
+// 従来のポーリングロジックを別名関数に退避
+function startLegacyNoticesPolling() {
   if (noticesPollingTimer) return;
-  
-  // 初回取得
   fetchNotices();
-  
-  // 30秒ごとに更新
   noticesPollingTimer = setInterval(() => {
-    if (SESSION_TOKEN) {
-      fetchNotices();
-    } else {
-      stopNoticesPolling();
-    }
+    if (SESSION_TOKEN) fetchNotices();
+    else stopNoticesPolling();
   }, 30000);
 }
 
 function stopNoticesPolling() {
-  if (noticesPollingTimer) {
-    clearInterval(noticesPollingTimer);
-    noticesPollingTimer = null;
-  }
+  // ポーリング停止
+  if (noticesPollingTimer) { clearInterval(noticesPollingTimer); noticesPollingTimer = null; }
+  // リスナー解除
+  if (window.noticesUnsubscribe) { window.noticesUnsubscribe(); window.noticesUnsubscribe = null; }
 }
 
 function loadNoticeCollapsePreference() {

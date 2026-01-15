@@ -210,6 +210,13 @@ function startRemoteSync(immediate) {
       if (!useSdkMode) {
         console.log("Plan A Connected: Using Firebase SDK Realtime Listener");
         useSdkMode = true;
+
+        // 1. Configポーリング停止
+        if (configWatchTimer) { clearInterval(configWatchTimer); configWatchTimer = null; }
+
+        // 2. お知らせ・ツールの監視もSDKモードで開始（既存のタイマーがあればリセットされるロジックにする）
+        if (typeof startNoticesPolling === 'function') startNoticesPolling(); 
+        if (typeof startToolsPolling === 'function') startToolsPolling();
       }
 
       const changes = {};
