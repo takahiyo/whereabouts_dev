@@ -1346,7 +1346,8 @@
 
   .member-table th:nth-child(4),
   .member-table td:nth-child(4) {
-    width: 20px;
+    width: 35px;
+    /* +15px for ~1 character width */
   }
 
   .member-table th:nth-child(5),
@@ -1356,13 +1357,15 @@
 
   .member-table th:nth-child(7),
   .member-table td:nth-child(7) {
-    width: 120px;
+    width: 110px;
+    /* Reduced by 10px to minimize padding */
     text-align: center;
   }
 
   .member-table th:nth-child(6),
   .member-table td:nth-child(6) {
-    min-width: 200px;
+    min-width: 170px;
+    /* Reduced by 30px to compensate */
   }
 
   .member-email {
