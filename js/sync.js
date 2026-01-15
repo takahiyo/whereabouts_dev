@@ -13,6 +13,11 @@ const DEFAULT_BUSINESS_HOURS = [
   "12:00-20:30",
 ];
 
+// ハイブリッド同期用の状態管理
+let useSdkMode = false;         // 現在SDKモードで動いているか
+let unsubscribeSnapshot = null; // Firestoreのリスナー解除用関数
+let fallbackTimer = null;       // フォールバック（Plan B切替）判定タイマー
+
 function defaultMenus() {
   return {
     timeStepMinutes: 30,
@@ -140,22 +145,15 @@ function normalizeConfigClient(cfg) {
     };
   });
 }
-async function fastFetchDataOnce() {
-  return await apiPost({ action: 'get', token: SESSION_TOKEN, nocache: '1' });
-}
-function startRemoteSync(immediate) {
+
+// Plan B: Workers経由のポーリング（フォールバック用）
+async function startLegacyPolling(immediate) {
+  console.log("Fallback to Workers Polling (Plan B)");
+  useSdkMode = false;
+  
   if (remotePullTimer) { clearInterval(remotePullTimer); remotePullTimer = null; }
-  if (immediate) {
-    fastFetchDataOnce().then(async r => {
-      if (r?.error === 'unauthorized') {
-        if (remotePullTimer) { clearInterval(remotePullTimer); remotePullTimer = null; }
-        await logout();
-        return;
-      }
-      if (r && r.data) applyState(r.data);
-    }).catch(() => { });
-  }
-  remotePullTimer = setInterval(async () => {
+  
+  const pollAction = async () => {
     const r = await apiPost({ action: 'get', token: SESSION_TOKEN });
     if (r?.error === 'unauthorized') {
       if (remotePullTimer) { clearInterval(remotePullTimer); remotePullTimer = null; }
@@ -163,8 +161,81 @@ function startRemoteSync(immediate) {
       return;
     }
     if (r && r.data) applyState(r.data);
-  }, REMOTE_POLL_MS);
+  };
+
+  if (immediate) {
+    pollAction().catch(() => {});
+  }
+  remotePullTimer = setInterval(pollAction, REMOTE_POLL_MS);
 }
+
+// データ同期開始（Graceful Degradation: Plan A -> Plan B）
+function startRemoteSync(immediate) {
+  // 既存のタイマー/リスナーをクリア
+  if (remotePullTimer) { clearInterval(remotePullTimer); remotePullTimer = null; }
+  if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+
+  // ログイン済みチェック（CURRENT_OFFICE_IDが必要）
+  if (typeof CURRENT_OFFICE_ID === 'undefined' || !CURRENT_OFFICE_ID) {
+    console.error("Office ID not found. Cannot start sync.");
+    return;
+  }
+
+  // SDKが利用できない、または初期化失敗時は即Plan Bへ
+  if (typeof firebase === 'undefined' || !firebase.apps.length) {
+    startLegacyPolling(immediate);
+    return;
+  }
+
+  console.log("Attempting Plan A: Firebase SDK connection...");
+
+  // タイムアウト設定: 5秒以内にSDKでデータが取れなければPlan Bへ移行
+  fallbackTimer = setTimeout(() => {
+    if (!useSdkMode) {
+      console.warn("Plan A timeout (5s). Switching to Plan B.");
+      startLegacyPolling(immediate);
+    }
+  }, 5000);
+
+  // 匿名認証してFirestoreに接続
+  firebase.auth().signInAnonymously().then(() => {
+    const db = firebase.firestore();
+    const docRef = db.collection('offices').doc(CURRENT_OFFICE_ID).collection('members');
+
+    unsubscribeSnapshot = docRef.onSnapshot((snapshot) => {
+      // 成功: Plan Bへのフォールバックタイマーを解除
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+      
+      if (!useSdkMode) {
+        console.log("Plan A Connected: Using Firebase SDK Realtime Listener");
+        useSdkMode = true;
+      }
+
+      const changes = {};
+      snapshot.docChanges().forEach((change) => {
+        // Firestoreのデータをアプリ形式に変換
+        changes[change.doc.id] = change.doc.data();
+      });
+
+      // 変更があった場合のみ適用
+      if (Object.keys(changes).length > 0) {
+        applyState(changes);
+      }
+    }, (error) => {
+      console.error("Plan A Error (SDK):", error);
+      // 権限エラーやネットワークエラー時はPlan Bへ
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+      if (!useSdkMode) {
+        startLegacyPolling(immediate);
+      }
+    });
+  }).catch((e) => {
+    console.error("Auth/Init Error:", e);
+    startLegacyPolling(immediate);
+  });
+}
+
 async function fetchConfigOnce() {
   const cfg = await apiPost({ action: 'getConfig', token: SESSION_TOKEN, nocache: '1' });
   if (cfg?.error === 'unauthorized') {
@@ -234,6 +305,8 @@ async function pushRowDelta(key) {
     st.workHours = st.workHours == null ? '' : String(st.workHours);
     const baseRev = {}; baseRev[key] = Number(tr.dataset.rev || 0);
     const payload = { updated: Date.now(), data: { [key]: st } };
+    
+    // 書き込みは整合性のため、常にWorkers経由（apiPost）で行う
     const r = await apiPost({ action: 'set', token: SESSION_TOKEN, data: JSON.stringify(payload), baseRev: JSON.stringify(baseRev) });
 
     if (!r) { toast('通信エラー', false); return; }
