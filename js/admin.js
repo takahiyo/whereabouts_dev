@@ -259,7 +259,8 @@ async function loadAdminMembers(force) {
   }
 }
 
-function normalizeMemberOrdering() {
+function normalizeMemberOrdering(options = {}) {
+  const { preferCurrentOrder = false } = options;
   const orderBase = [];
   adminGroupOrder.forEach(g => {
     const name = String(g || '');
@@ -271,6 +272,14 @@ function normalizeMemberOrdering() {
     if (name && !orderBase.includes(name)) { orderBase.push(name); }
   });
   adminGroupOrder = orderBase;
+  if (preferCurrentOrder) {
+    const counters = new Map();
+    adminMemberList.forEach(m => {
+      const cur = counters.get(m.group) || 0;
+      m.order = cur;
+      counters.set(m.group, cur + 1);
+    });
+  }
   adminMemberList.sort((a, b) => {
     const ga = orderBase.indexOf(a.group); const gb = orderBase.indexOf(b.group);
     if (ga !== gb) return ga - gb;
@@ -422,7 +431,7 @@ function enableMemberDrag() {
       adminMemberList.splice(draggingIdx, 1);
       const insertIdx = before ? targetIdx : targetIdx + 1;
       adminMemberList.splice(insertIdx > draggingIdx ? insertIdx - 1 : insertIdx, 0, dragging);
-      normalizeMemberOrdering();
+      normalizeMemberOrdering({ preferCurrentOrder: true });
       renderMemberTable();
     });
   });
@@ -505,7 +514,7 @@ function moveMember(id, dir) {
   const tmp = adminMemberList[targetIdx];
   adminMemberList[targetIdx] = adminMemberList[idx];
   adminMemberList[idx] = tmp;
-  normalizeMemberOrdering();
+  normalizeMemberOrdering({ preferCurrentOrder: true });
   renderMemberTable();
 }
 
