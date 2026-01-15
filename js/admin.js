@@ -132,6 +132,14 @@ btnSetPw.addEventListener('click', async () => {
 if (adminModal) {
   const adminTabButtons = adminModal.querySelectorAll('.admin-tabs .tab-btn');
   const adminTabPanels = adminModal.querySelectorAll('.tab-panel');
+  const resetPanelScroll = (panel) => {
+    if (!panel) return;
+    Array.from(panel.children).forEach((child) => {
+      if (child.scrollHeight > child.clientHeight) {
+        child.scrollTop = 0;
+      }
+    });
+  };
 
   adminTabButtons.forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -149,7 +157,10 @@ if (adminModal) {
         tools: adminModal.querySelector('#tabTools')
       };
       const panel = panelMap[targetTab];
-      if (panel) panel.classList.add('active');
+      if (panel) {
+        panel.classList.add('active');
+        resetPanelScroll(panel);
+      }
 
       if (targetTab === 'notices') {
         if (typeof autoLoadNoticesOnAdminOpen === 'function') {
