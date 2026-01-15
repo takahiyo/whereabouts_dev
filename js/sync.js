@@ -150,9 +150,9 @@ function normalizeConfigClient(cfg) {
 async function startLegacyPolling(immediate) {
   console.log("Fallback to Workers Polling (Plan B)");
   useSdkMode = false;
-  
+
   if (remotePullTimer) { clearInterval(remotePullTimer); remotePullTimer = null; }
-  
+
   const pollAction = async () => {
     const r = await apiPost({ action: 'get', token: SESSION_TOKEN });
     if (r?.error === 'unauthorized') {
@@ -164,7 +164,7 @@ async function startLegacyPolling(immediate) {
   };
 
   if (immediate) {
-    pollAction().catch(() => {});
+    pollAction().catch(() => { });
   }
   remotePullTimer = setInterval(pollAction, REMOTE_POLL_MS);
 }
@@ -206,7 +206,7 @@ function startRemoteSync(immediate) {
     unsubscribeSnapshot = docRef.onSnapshot((snapshot) => {
       // 成功: Plan Bへのフォールバックタイマーを解除
       if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-      
+
       if (!useSdkMode) {
         console.log("Plan A Connected: Using Firebase SDK Realtime Listener");
         useSdkMode = true;
@@ -215,15 +215,24 @@ function startRemoteSync(immediate) {
         if (configWatchTimer) { clearInterval(configWatchTimer); configWatchTimer = null; }
 
         // 2. お知らせ・ツールの監視もSDKモードで開始（既存のタイマーがあればリセットされるロジックにする）
-        if (typeof startNoticesPolling === 'function') startNoticesPolling(); 
+        if (typeof startNoticesPolling === 'function') startNoticesPolling();
         if (typeof startToolsPolling === 'function') startToolsPolling();
       }
 
       const changes = {};
+      let needsConfigRefetch = false;
+
       snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' || change.type === 'removed') {
+          needsConfigRefetch = true;
+        }
         // Firestoreのデータをアプリ形式に変換
         changes[change.doc.id] = change.doc.data();
       });
+
+      if (needsConfigRefetch) {
+        fetchConfigOnce();
+      }
 
       // 変更があった場合のみ適用
       if (Object.keys(changes).length > 0) {
@@ -312,7 +321,7 @@ async function pushRowDelta(key) {
     st.workHours = st.workHours == null ? '' : String(st.workHours);
     const baseRev = {}; baseRev[key] = Number(tr.dataset.rev || 0);
     const payload = { updated: Date.now(), data: { [key]: st } };
-    
+
     // 書き込みは整合性のため、常にWorkers経由（apiPost）で行う
     const r = await apiPost({ action: 'set', token: SESSION_TOKEN, data: JSON.stringify(payload), baseRev: JSON.stringify(baseRev) });
 
