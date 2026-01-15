@@ -319,10 +319,17 @@ document.querySelectorAll('.manual-tab-btn').forEach(btn => {
     document.querySelectorAll('.manual-tab-content').forEach(c => c.classList.remove('active'));
     // クリックされたタブボタンとそのコンテンツにactiveクラスを追加
     btn.classList.add('active');
+    let targetContent = null;
     if (targetTab === 'user') {
-      document.getElementById('manualUser').classList.add('active');
+      targetContent = document.getElementById('manualUser');
     } else if (targetTab === 'admin') {
-      document.getElementById('manualAdmin').classList.add('active');
+      targetContent = document.getElementById('manualAdmin');
+    }
+    if (targetContent) {
+      targetContent.classList.add('active');
+      if (targetContent.scrollHeight > targetContent.clientHeight) {
+        targetContent.scrollTop = 0;
+      }
     }
   });
 });
