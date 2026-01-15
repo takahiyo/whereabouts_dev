@@ -23,6 +23,19 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-if (typeof firebase !== 'undefined') {
+function initFirebase() {
+    if (typeof firebase === 'undefined') {
+        return false;
+    }
+    if (firebase.apps && firebase.apps.length > 0) {
+        return true;
+    }
     firebase.initializeApp(firebaseConfig);
+    return true;
+}
+
+if (!initFirebase()) {
+    window.addEventListener('load', () => {
+        initFirebase();
+    }, { once: true });
 }

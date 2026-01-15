@@ -9,7 +9,7 @@ const SESSION_OFFICE_NAME_KEY = "presence-office-name";
 
 /* 要素 */
 const board=document.getElementById('board'), toastEl=document.getElementById('toast'), diag=document.getElementById('diag');
-const loginEl=document.getElementById('login'), loginMsg=document.getElementById('loginMsg'), pwInput=document.getElementById('pw'), officeSel=document.getElementById('officeSel');
+const loginEl=document.getElementById('login'), loginMsg=document.getElementById('loginMsg'), pwInput=document.getElementById('pw'), officeSel=document.getElementById('officeSel'), btnLogin=document.getElementById('btnLogin');
 const menuEl=document.getElementById('groupMenu'), menuList=document.getElementById('groupMenuList'), menuTitle=document.getElementById('groupMenuTitle'), titleBtn=document.getElementById('titleBtn');
 const noticesBtn=document.getElementById('noticesBtn'), adminBtn=document.getElementById('adminBtn'), logoutBtn=document.getElementById('logoutBtn'), adminModal=document.getElementById('adminModal'), adminClose=document.getElementById('adminClose');
 const toolsBtn=document.getElementById('toolsBtn'), toolsModal=document.getElementById('toolsModal'), toolsModalClose=document.getElementById('toolsModalClose');

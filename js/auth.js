@@ -11,7 +11,10 @@ function logoutButtonsCleanup() {
 
 async function checkLogin() {
   return new Promise((resolve) => {
-    if (typeof firebase === 'undefined') {
+    if (typeof initFirebase === 'function') {
+      initFirebase();
+    }
+    if (typeof firebase === 'undefined' || !(firebase.apps && firebase.apps.length)) {
       console.error("Firebase SDK not loaded");
       resolve(false);
       return;
@@ -53,6 +56,12 @@ async function checkLogin() {
 
 async function login(officeInput, passwordInput) {
   try {
+    if (typeof initFirebase === 'function') {
+      initFirebase();
+    }
+    if (typeof firebase === 'undefined' || !(firebase.apps && firebase.apps.length)) {
+      throw new Error("Firebaseの初期化に失敗しました。ネットワーク接続を確認してください。");
+    }
     // 1. Workerへパスワード確認リクエスト
     const formData = new URLSearchParams();
     formData.append('action', 'login');
