@@ -366,23 +366,31 @@ function renderMemberTable() {
     return;
   }
 
+
   const fragment = document.createDocumentFragment();
   rows.forEach((m, idx) => {
     const tr = document.createElement('tr');
     tr.dataset.memberId = m.id;
 
-    // --- [修正] 左端: 順序変更ボタンと連番 ---
+    // --- [修正] 左端: 順番列 (数字 + ボタン) ---
     const orderTd = document.createElement('td');
-    orderTd.className = 'member-order-cell'; // スタイル調整用クラス
+    orderTd.className = 'member-order-cell'; // 新しいスタイルクラス
 
+    // 3桁ゼロ埋め数字
+    const numSpan = document.createElement('span');
+    numSpan.className = 'member-order-num';
+    numSpan.textContent = String(idx + 1).padStart(3, '0');
+
+    // 移動ボタン群
     const moveActions = document.createElement('div');
-    moveActions.className = 'member-move-actions'; // グループ順序と同様のコンテナ
+    moveActions.className = 'member-move-actions';
 
     const upBtn = document.createElement('button');
     upBtn.className = 'btn-move-up';
     upBtn.textContent = '▲';
     upBtn.title = '上に移動';
-    // フィルタ中は移動不可にする等の制御はお好みで（今回は常に表示）
+    // 一番上の行は無効化
+    upBtn.disabled = (idx === 0);
     upBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       moveMember(m.id, -1);
@@ -392,6 +400,8 @@ function renderMemberTable() {
     downBtn.className = 'btn-move-down';
     downBtn.textContent = '▼';
     downBtn.title = '下に移動';
+    // 一番下の行は無効化
+    downBtn.disabled = (idx === rows.length - 1);
     downBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       moveMember(m.id, 1);
@@ -399,11 +409,8 @@ function renderMemberTable() {
 
     moveActions.append(upBtn, downBtn);
 
-    const numSpan = document.createElement('span');
-    numSpan.className = 'member-order-num';
-    numSpan.textContent = `#${idx + 1}`;
-
-    orderTd.append(moveActions, numSpan);
+    // レイアウト: 数字 : ボタン
+    orderTd.append(numSpan, document.createTextNode(' : '), moveActions);
     // ------------------------------------------
 
     const groupTd = document.createElement('td'); groupTd.textContent = m.group || '';
@@ -422,9 +429,11 @@ function renderMemberTable() {
       emailTd.appendChild(emailWrap);
     }
 
-    // --- [修正] 右端: 編集・削除のみ ---
+    // --- [修正] 右端: 操作列 (横並びコンテナ) ---
     const actionTd = document.createElement('td');
-    actionTd.className = 'member-row-actions';
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'member-row-actions'; // 横並び用クラス
 
     const editBtn = document.createElement('button');
     editBtn.textContent = '編集';
@@ -436,15 +445,14 @@ function renderMemberTable() {
     delBtn.className = 'btn-danger';
     delBtn.addEventListener('click', () => deleteMember(m.id));
 
-    actionTd.append(editBtn, delBtn);
+    actionRow.append(editBtn, delBtn);
+    actionTd.appendChild(actionRow);
     // ------------------------------------------
 
     tr.append(orderTd, groupTd, nameTd, extTd, mobileTd, emailTd, actionTd);
     fragment.appendChild(tr);
   });
   memberTableBody.appendChild(fragment);
-
-  // enableMemberDrag(); // ドラッグ機能は廃止するため呼び出さない
 }
 
 // function enableMemberDrag() { ... } // 不要になったため削除
