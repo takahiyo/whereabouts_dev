@@ -189,7 +189,6 @@ if (adminModal) {
 let adminMemberList = [], adminMemberData = {}, adminGroupOrder = [], adminMembersLoaded = false;
 let adminToolsLoaded = false, adminToolsOfficeId = '';
 
-if (btnMemberReload) { btnMemberReload.addEventListener('click', () => loadAdminMembers(true)); }
 if (btnMemberSave) { btnMemberSave.addEventListener('click', () => handleMemberSave()); }
 if (memberEditForm) {
   memberEditForm.addEventListener('submit', (e) => {
