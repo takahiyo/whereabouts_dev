@@ -94,6 +94,13 @@ async function login(officeInput, passwordInput) {
     // UIを即座に表示状態に切り替える
     updateAuthUI();
 
+    if (typeof nameFilter !== 'undefined') {
+      nameFilter.value = '';
+      if (typeof applyFilters === 'function') {
+        applyFilters();
+      }
+    }
+
     return true;
 
   } catch (error) {
