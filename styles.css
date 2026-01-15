@@ -1330,51 +1330,47 @@
     white-space: nowrap;
   }
 
-  /* --- Member Table Column Widths (Total Min: 1580px) --- */
-  /* 1. Order: 150px */
+  /* --- 以下、列幅の修正 --- */
+
+  /* 1列目: 順番 (150px 固定) */
   .member-table th:nth-child(1),
   .member-table td:nth-child(1) {
     width: 150px;
-    text-align: center;
     white-space: nowrap;
+    text-align: center;
   }
 
-  /* 2. Group: Min 400px */
+  /* 2列目: グループ (最低 400px - 可変) */
   .member-table th:nth-child(2),
   .member-table td:nth-child(2) {
-    width: calc((100% - 590px) * 0.40);
-    min-width: 400px;
+    width: 400px;
   }
 
-  /* 3. Name: Min 240px */
+  /* 3列目: 氏名 (最低 240px - 可変) */
   .member-table th:nth-child(3),
   .member-table td:nth-child(3) {
-    width: calc((100% - 590px) * 0.24);
-    min-width: 240px;
+    width: 240px;
   }
 
-  /* 4. Ext: 80px */
+  /* 4列目: 内線 (80px 固定) */
   .member-table th:nth-child(4),
   .member-table td:nth-child(4) {
     width: 80px;
-    text-align: center;
   }
 
-  /* 5. Mobile: 180px */
+  /* 5列目: 携帯 (180px 固定) */
   .member-table th:nth-child(5),
   .member-table td:nth-child(5) {
     width: 180px;
-    text-align: center;
   }
 
-  /* 6. Email: Min 350px */
+  /* 6列目: Email (最低 350px - 可変) */
   .member-table th:nth-child(6),
   .member-table td:nth-child(6) {
-    width: calc((100% - 590px) * 0.36);
-    min-width: 350px;
+    width: 350px;
   }
 
-  /* 7. Action: 180px */
+  /* 7列目: 操作 (180px 固定) */
   .member-table th:nth-child(7),
   .member-table td:nth-child(7) {
     width: 180px;
