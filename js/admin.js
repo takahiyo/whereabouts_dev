@@ -374,7 +374,10 @@ function renderMemberTable() {
 
     // --- [修正] 左端: 順番列 (数字 + ボタン) ---
     const orderTd = document.createElement('td');
-    orderTd.className = 'member-order-cell'; // 新しいスタイルクラス
+    // orderTd.className = 'member-order-cell'; // tdに直接flexを当てると罫線トラブルの原因になるので廃止
+
+    const orderWrapper = document.createElement('div');
+    orderWrapper.className = 'member-order-cell'; // ラッパーにクラスを移動
 
     // 3桁ゼロ埋め数字
     const numSpan = document.createElement('span');
@@ -409,8 +412,9 @@ function renderMemberTable() {
 
     moveActions.append(upBtn, downBtn);
 
-    // レイアウト: 数字 : ボタン
-    orderTd.append(numSpan, document.createTextNode(' : '), moveActions);
+    // レイアウト: 数字 + ボタン (コロン削除、ラッパーに追加)
+    orderWrapper.append(numSpan, moveActions);
+    orderTd.appendChild(orderWrapper);
     // ------------------------------------------
 
     const groupTd = document.createElement('td'); groupTd.textContent = m.group || '';

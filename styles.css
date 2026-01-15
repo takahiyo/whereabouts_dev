@@ -1332,9 +1332,16 @@
 
   .member-table th:nth-child(1),
   .member-table td:nth-child(1) {
-    width: 140px;
+    width: 190px;
     white-space: nowrap;
     text-align: center;
+  }
+
+  /* Name Column (formerly auto, now restricted/adjusted) */
+  .member-table th:nth-child(3),
+  .member-table td:nth-child(3) {
+    width: 160px;
+    /* Tentative 2/3 adjustment */
   }
 
   .member-table th:nth-child(4),
