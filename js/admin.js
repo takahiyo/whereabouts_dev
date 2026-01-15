@@ -296,6 +296,7 @@ function renderGroupOrderList() {
     item.className = 'group-order-item';
     item.dataset.groupName = groupName;
     const label = document.createElement('span');
+    label.className = 'group-order-label';
     label.textContent = groupName;
     const actions = document.createElement('div');
     actions.className = 'group-order-actions';
@@ -312,7 +313,7 @@ function renderGroupOrderList() {
     downBtn.disabled = idx === order.length - 1;
     downBtn.addEventListener('click', () => moveGroupOrder(groupName, 1));
     actions.append(upBtn, downBtn);
-    item.append(label, actions);
+    item.append(actions, label);
     groupOrderList.appendChild(item);
   });
 }
