@@ -11,7 +11,7 @@ const TOKEN_DEFAULT_TTL = 3600000;
 // publicListOffices が利用できない環境で使用する拠点一覧（id, name）
 const PUBLIC_OFFICE_FALLBACKS = [];
 
-// Firebase Configuration
+// Firebase Configuration (Compat版)
 const firebaseConfig = {
     apiKey: "AIzaSyDRTr7h0diRJW6U1dQJaJgr303A5wm3aTE",
     authDomain: "whereabouts-438df.firebaseapp.com",
@@ -22,18 +22,23 @@ const firebaseConfig = {
     measurementId: "G-26G0TS4HDW"
 };
 
-// Initialize Firebase
+// Initialize Firebase (Compat版)
 function initFirebase() {
+    // SDKが正しく読み込まれているかチェック
     if (typeof firebase === 'undefined') {
+        console.error("Firebase SDK not loaded.");
         return false;
     }
+    // すでに初期化済みなら何もしない
     if (firebase.apps && firebase.apps.length > 0) {
         return true;
     }
+    // 初期化を実行
     firebase.initializeApp(firebaseConfig);
     return true;
 }
 
+// 即座に初期化を試み、失敗したらロード完了を待って再試行
 if (!initFirebase()) {
     window.addEventListener('load', () => {
         initFirebase();
