@@ -365,15 +365,52 @@ function renderMemberTable() {
     setMemberTableMessage('条件に一致するメンバーが見つかりません');
     return;
   }
+
+  const fragment = document.createDocumentFragment();
   rows.forEach((m, idx) => {
     const tr = document.createElement('tr');
     tr.dataset.memberId = m.id;
+
+    // --- [修正] 左端: 順序変更ボタンと連番 ---
     const orderTd = document.createElement('td');
-    orderTd.innerHTML = `<div class="member-row-actions"><span class="member-drag-handle" draggable="true" title="ドラッグで並び替え">⇅</span><span>#${idx + 1}</span></div>`;
+    orderTd.className = 'member-order-cell'; // スタイル調整用クラス
+
+    const moveActions = document.createElement('div');
+    moveActions.className = 'member-move-actions'; // グループ順序と同様のコンテナ
+
+    const upBtn = document.createElement('button');
+    upBtn.className = 'btn-move-up';
+    upBtn.textContent = '▲';
+    upBtn.title = '上に移動';
+    // フィルタ中は移動不可にする等の制御はお好みで（今回は常に表示）
+    upBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveMember(m.id, -1);
+    });
+
+    const downBtn = document.createElement('button');
+    downBtn.className = 'btn-move-down';
+    downBtn.textContent = '▼';
+    downBtn.title = '下に移動';
+    downBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveMember(m.id, 1);
+    });
+
+    moveActions.append(upBtn, downBtn);
+
+    const numSpan = document.createElement('span');
+    numSpan.className = 'member-order-num';
+    numSpan.textContent = `#${idx + 1}`;
+
+    orderTd.append(moveActions, numSpan);
+    // ------------------------------------------
+
     const groupTd = document.createElement('td'); groupTd.textContent = m.group || '';
     const nameTd = document.createElement('td'); nameTd.textContent = m.name || '';
     const extTd = document.createElement('td'); extTd.className = 'numeric-cell'; extTd.textContent = m.ext || '';
     const mobileTd = document.createElement('td'); mobileTd.className = 'numeric-cell'; mobileTd.textContent = m.mobile || '';
+
     const emailTd = document.createElement('td');
     if (m.email) {
       const [localPart, domainPart] = m.email.split('@');
@@ -384,58 +421,34 @@ function renderMemberTable() {
       }
       emailTd.appendChild(emailWrap);
     }
-    const actionTd = document.createElement('td'); actionTd.className = 'member-row-actions';
-    const editBtn = document.createElement('button'); editBtn.textContent = '編集'; editBtn.className = 'btn-secondary';
+
+    // --- [修正] 右端: 編集・削除のみ ---
+    const actionTd = document.createElement('td');
+    actionTd.className = 'member-row-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '編集';
+    editBtn.className = 'btn-secondary';
     editBtn.addEventListener('click', () => openMemberEditor(m));
-    const delBtn = document.createElement('button'); delBtn.textContent = '削除'; delBtn.className = 'btn-danger';
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '削除';
+    delBtn.className = 'btn-danger';
     delBtn.addEventListener('click', () => deleteMember(m.id));
-    const upBtn = document.createElement('button'); upBtn.textContent = '▲'; upBtn.title = '上に移動';
-    upBtn.addEventListener('click', () => moveMember(m.id, -1));
-    const downBtn = document.createElement('button'); downBtn.textContent = '▼'; downBtn.title = '下に移動';
-    downBtn.addEventListener('click', () => moveMember(m.id, 1));
-    actionTd.append(editBtn, delBtn, upBtn, downBtn);
+
+    actionTd.append(editBtn, delBtn);
+    // ------------------------------------------
+
     tr.append(orderTd, groupTd, nameTd, extTd, mobileTd, emailTd, actionTd);
-    memberTableBody.appendChild(tr);
+    fragment.appendChild(tr);
   });
-  enableMemberDrag();
+  memberTableBody.appendChild(fragment);
+
+  // enableMemberDrag(); // ドラッグ機能は廃止するため呼び出さない
 }
 
-function enableMemberDrag() {
-  if (!memberTableBody) return;
-  let draggingId = '';
-  memberTableBody.querySelectorAll('.member-drag-handle').forEach(handle => {
-    handle.addEventListener('dragstart', (e) => {
-      const row = e.target.closest('tr');
-      draggingId = row?.dataset.memberId || '';
-      handle.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    handle.addEventListener('dragend', () => {
-      draggingId = ''; handle.classList.remove('dragging');
-      memberTableBody.querySelectorAll('tr').forEach(r => r.classList.remove('drag-over'));
-    });
-  });
-  memberTableBody.querySelectorAll('tr').forEach(tr => {
-    tr.addEventListener('dragover', (e) => {
-      if (!draggingId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-      const targetId = tr.dataset.memberId || '';
-      if (!targetId || targetId === draggingId) return;
-      const draggingIdx = adminMemberList.findIndex(x => x.id === draggingId);
-      const targetIdx = adminMemberList.findIndex(x => x.id === targetId);
-      if (draggingIdx < 0 || targetIdx < 0) return;
-      const dragging = adminMemberList[draggingIdx];
-      const target = adminMemberList[targetIdx];
-      if (dragging.group !== target.group) return;
-      const rect = tr.getBoundingClientRect();
-      const before = e.clientY < rect.top + rect.height / 2;
-      adminMemberList.splice(draggingIdx, 1);
-      const insertIdx = before ? targetIdx : targetIdx + 1;
-      adminMemberList.splice(insertIdx > draggingIdx ? insertIdx - 1 : insertIdx, 0, dragging);
-      normalizeMemberOrdering({ preferCurrentOrder: true });
-      renderMemberTable();
-    });
-  });
-}
+// function enableMemberDrag() { ... } // 不要になったため削除
+
 
 function openMemberEditor(member) {
   if (memberEditId) memberEditId.value = member?.id || '';
