@@ -439,6 +439,9 @@ function openMemberEditor(member) {
     memberEditModeLabel.textContent = member ? `編集中：${member.name || ''}` : '新規追加／編集フォーム';
   }
   refreshMemberGroupOptions();
+  if (memberEditTop && adminModal?.contains(memberEditTop)) {
+    memberEditTop.scrollIntoView({ block: 'start' });
+  }
   if (memberEditName) {
     memberEditName.focus({ preventScroll: true });
   }

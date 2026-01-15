@@ -28,6 +28,7 @@ const renameOfficeName=document.getElementById('renameOfficeName'), btnRenameOff
 const setPw=document.getElementById('setPw'), setAdminPw=document.getElementById('setAdminPw'), btnSetPw=document.getElementById('btnSetPw');
 const memberTableBody=document.getElementById('memberTableBody'), btnMemberSave=document.getElementById('btnMemberSave'), btnMemberReload=document.getElementById('btnMemberReload');
 const memberEditForm=document.getElementById('memberEditForm');
+const memberEditTop=document.getElementById('memberEditTop');
 const memberEditName=document.getElementById('memberEditName'), memberEditExt=document.getElementById('memberEditExt'), memberEditMobile=document.getElementById('memberEditMobile'), memberEditEmail=document.getElementById('memberEditEmail'), memberEditGroup=document.getElementById('memberEditGroup');
 const memberGroupOptions=document.getElementById('memberGroupOptions'), memberEditId=document.getElementById('memberEditId'), memberEditModeLabel=document.getElementById('memberEditModeLabel');
 const memberEditReset=document.getElementById('memberEditReset'), memberFilterInput=document.getElementById('memberFilterInput'), btnMemberFilterClear=document.getElementById('btnMemberFilterClear');
