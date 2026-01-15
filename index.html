@@ -53,7 +53,7 @@
   <div id="adminModal" class="admin-modal" aria-modal="true" role="dialog">
     <div class="admin-card">
       <div class="admin-card-header">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="admin-modal-header-row">
           <h3>管理パネル</h3><button id="adminClose">閉じる</button>
         </div>
 
@@ -80,7 +80,7 @@
                 <h5>📥 在席確認表リスト エクスポート</h5>
                 <div class="admin-row"><button id="btnExport">ダウンロード</button></div>
                 <div class="admin-note">形式：グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</div>
-                <div class="admin-note" style="font-size:11px;color:#6b7280;">※従来フォーマット（携帯番号・Email列なし）も引き続き対応</div>
+                <div class="admin-note u-font-sm u-text-gray">※従来フォーマット（携帯番号・Email列なし）も引き続き対応</div>
               </div>
               <div class="admin-subsection">
                 <h5>📤 在席確認表リスト インポート</h5>
@@ -153,7 +153,7 @@
                 <h5>📦 グループ並び替え</h5>
                 <div class="admin-note">↑↓ボタンでグループの並び順を変更できます。保存時はメンバー順を維持したままグループ順のみ反映されます。</div>
                 <div id="groupOrderList" class="group-order-list"></div>
-                <div id="groupOrderEmpty" class="admin-note" style="margin-top:6px;">グループがありません。</div>
+                <div id="groupOrderEmpty" class="admin-note u-mt-6">グループがありません。</div>
               </div>
               <div class="member-filter-row">
                 <label for="memberFilterInput" class="member-filter-label">氏名フィルター</label>
@@ -166,18 +166,18 @@
                 <table class="member-table">
                   <thead>
                     <tr>
-                      <th style="width:64px;">順番</th>
+                      <th class="u-w-64">順番</th>
                       <th>グループ</th>
                       <th>氏名</th>
                       <th>内線</th>
                       <th>携帯</th>
                       <th>Email</th>
-                      <th style="width:160px;">操作</th>
+                      <th class="u-w-160">操作</th>
                     </tr>
                   </thead>
                   <tbody id="memberTableBody">
                     <tr>
-                      <td colspan="7" style="text-align:center;color:#6b7280;">読み込み待ち</td>
+                      <td colspan="7" class="u-text-center u-text-gray">読み込み待ち</td>
                     </tr>
                   </tbody>
                 </table>
@@ -213,13 +213,13 @@
             <div class="admin-box">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <h4 style="margin:0;">登録済みのイベント</h4>
-                <button id="btnExportEvent" class="btn-secondary" style="font-size:13px;">📄 イベントをエクスポート</button>
+                <button id="btnExportEvent" class="btn-secondary u-font-13">📄 イベントをエクスポート</button>
               </div>
               <div class="vacation-table-wrap">
                 <table class="vacation-table">
                   <thead>
                     <tr>
-                      <th style="width:44px;">並び</th>
+                      <th class="u-w-44">並び</th>
                       <th>タイトル</th>
                       <th>期間</th>
                       <th>対象拠点</th>
@@ -232,7 +232,7 @@
                   </thead>
                   <tbody id="vacationListBody">
                     <tr>
-                      <td colspan="9" style="text-align:center;color:#6b7280;">読み込み待ち</td>
+                      <td colspan="9" class="u-text-center u-text-gray">読み込み待ち</td>
                     </tr>
                   </tbody>
                 </table>
@@ -286,7 +286,7 @@
                     </select>
                   </label>
                 </div>
-                <div class="vacation-row" style="display:none;">
+                <div class="vacation-row u-hidden">
                   <label>メンバーの休暇指定（ガントで自動入力）
                     <input id="vacationMembersBits" type="text" placeholder="ガント入力で自動反映されます" readonly />
                     <span class="vacation-helper">※ 手入力は不要です。下のガント表で休暇にしたいメンバーと日付をONにしてください。</span>
@@ -298,14 +298,14 @@
                   <button id="btnVacationClear" class="btn-secondary">🧹 入力クリア</button>
                   <button id="btnVacationReload" class="btn-secondary">🔄 一覧更新</button>
                 </div>
-                <div class="vacation-row" style="display:none;">
+                <div class="vacation-row u-hidden">
                   <div class="vacation-gantt-head">
                     <div class="vacation-gantt-title">ガント入力</div>
                     <div class="vacation-gantt-help">開始日/終了日に合わせて日付スロットを生成し、セルをクリック/ドラッグ（スマホはタップ）するとビットが切り替わります。</div>
                   </div>
                   <div id="vacationGantt" class="vacation-gantt" aria-live="polite"></div>
                 </div>
-                <div class="vacation-row" style="display:none;">
+                <div class="vacation-row u-hidden">
                   <label>ID（自動設定）
                     <input id="vacationId" type="text" readonly placeholder="新規作成時は空欄のまま" />
                   </label>
@@ -356,33 +356,33 @@
               <span>イベントを選択:</span>
               <select id="eventSelectDropdown" class="event-select-dropdown"></select>
             </label>
-            <button id="btnShowEventNotice" class="btn-secondary btn-show-event-notice" style="display:none;">📄
+            <button id="btnShowEventNotice" class="btn-secondary btn-show-event-notice u-hidden">📄
               イベントの内容を表示</button>
           </div>
-          <div id="vacationRadioList" class="vacation-radio-list" style="display:none;"></div>
+          <div id="vacationRadioList" class="vacation-radio-list u-hidden"></div>
           <div id="eventGanttWrap" class="vacation-gantt-head">
             <div class="vacation-gantt-sticky-header">
               <div class="event-toolbar">
                 <div class="event-toolbar__hint">
                   <span class="vacation-gantt-touch-hint">セルをクリック/ドラッグ（スマホはタップ）するとON/OFFを切り替えられます。</span>
-                  <span id="eventColorManualHint" class="event-color-manual-hint" role="status" aria-live="polite"
-                    style="display:none;"></span>
+                  <span id="eventColorManualHint" class="event-color-manual-hint u-hidden" role="status"
+                    aria-live="polite"></span>
                 </div>
-                <div class="vacation-actions" style="margin-bottom:0;display:flex;gap:8px;justify-content:flex-end;">
+                <div class="vacation-actions u-mb-0 u-flex-end-gap">
                   <button id="btnEventPrint" class="btn-secondary">🖨️ 印刷</button>
                 </div>
               </div>
-              <div id="eventGroupJumps" class="vacation-group-jumps" aria-label="グループジャンプ" style="display:none;">
+              <div id="eventGroupJumps" class="vacation-group-jumps u-hidden" aria-label="グループジャンプ">
                 <span class="jump-label">グループ移動</span>
                 <div class="jump-buttons" aria-label="グループジャンプボタン"></div>
-                <label class="jump-select" aria-label="グループジャンプ選択" style="display:none;">
+                <label class="jump-select u-hidden" aria-label="グループジャンプ選択">
                   <span class="sr-only">グループを選択</span>
                   <select id="eventGroupJumpSelect"></select>
                 </label>
               </div>
               <div id="eventLegendModal" class="event-legend event-legend-compact" aria-live="polite"></div>
             </div>
-            <div id="eventPrintInfo" style="display:none;"></div>
+            <div id="eventPrintInfo" class="u-hidden"></div>
             <div id="eventGantt" class="vacation-gantt" aria-live="polite"></div>
             <input id="eventStart" type="hidden" />
             <input id="eventEnd" type="hidden" />
@@ -424,8 +424,8 @@
   <div id="manualModal" class="manual-modal" aria-modal="true" role="dialog" aria-labelledby="manualTitle">
     <div class="manual-card" role="document">
       <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h3 id="manualTitle" style="margin:0;">マニュアル</h3>
+        <div class="admin-modal-header-row u-mb-12">
+          <h3 id="manualTitle" class="u-m-0">マニュアル</h3>
           <button id="manualClose" aria-label="閉じる">閉じる</button>
         </div>
         <div class="manual-tabs">
@@ -437,27 +437,27 @@
       <section id="manualUser" class="manual-section manual-tab-content active">
         <h4>📖 ユーザーマニュアル - 初めての方へ</h4>
 
-        <div style="background:#f0f8ff;padding:12px;margin:12px 0;border-left:4px solid #0073bb;border-radius:4px;">
+        <div class="manual-alert manual-alert-info">
           <strong>💡 このシステムについて</strong><br>
           在席確認表は、チームメンバーの在席状況をリアルタイムで共有するシステムです。<br>
           入力した内容は自動的に保存され、他の人のPCやスマートフォンにも即座に反映されます。
         </div>
 
         <h5>🔐 1. 初回ログイン（管理者からパスワードを受け取ってください）</h5>
-        <ol style="line-height:1.8;">
+        <ol class="u-lh-18">
           <li><strong>拠点を選択</strong>：ドロップダウンから所属する拠点（営業所）を選びます</li>
           <li><strong>パスワードを入力</strong>：管理者から教えてもらったパスワードを入力します</li>
           <li><strong>「ログイン」ボタンをクリック</strong></li>
           <li>✅ ログイン成功すると、在席確認表が表示されます</li>
         </ol>
-        <p style="margin:8px 0 16px 0;color:#666;font-size:0.9em;">
+        <p class="manual-subtext">
           ※ログイン状態は1時間保持され、自動的に延長されます。ブラウザを閉じた場合は再ログインが必要です。
         </p>
 
         <h5>👁️ 2. 画面の見方</h5>
-        <ul style="line-height:1.8;">
+        <ul class="u-lh-18">
           <li><strong>画面上部（ヘッダー）</strong>：
-            <ul style="margin-top:4px;">
+            <ul class="u-mt-4">
               <li>📍 <strong>タイトル</strong>：拠点名が表示されます（クリックするとグループ一覧メニューが開きます）</li>
               <li>🔍 <strong>氏名検索</strong>：特定の人を探すときに使います</li>
               <li>🎯 <strong>ステータス絞り込み</strong>：「外出中の人だけ」など、条件で絞り込めます</li>
@@ -468,7 +468,7 @@
             </ul>
           </li>
           <li><strong>メイン画面</strong>：
-            <ul style="margin-top:4px;">
+            <ul class="u-mt-4">
               <li>チーム（グループ）ごとに表が表示されます</li>
               <li>各行がメンバー1人の情報です</li>
               <li>スマートフォンでは自動的にカード表示に切り替わります</li>
@@ -478,80 +478,80 @@
 
         <h5>✍️ 3. 基本操作 - 自分の状態を更新する</h5>
 
-        <p style="margin:8px 0;"><strong>📝 業務時間の入力</strong></p>
-        <ol style="line-height:1.8;">
+        <p class="u-my-8"><strong>📝 業務時間の入力</strong></p>
+        <ol class="u-lh-18">
           <li>自分の行の「業務時間」欄をクリック</li>
           <li>直接入力するか、表示される候補リストから選択（例：<code>09:00-17:30</code>）</li>
           <li>✅ 入力が完了すると、約1秒後に自動保存されます（保存ボタンは不要です）</li>
         </ol>
 
-        <p style="margin:16px 0 8px 0;"><strong>🎨 ステータスの選択（色分けされます）</strong></p>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:0.9em;">
-          <tr style="background:#f5f5f5;">
-            <th style="padding:6px;border:1px solid #ddd;">ステータス</th>
-            <th style="padding:6px;border:1px solid #ddd;">色</th>
-            <th style="padding:6px;border:1px solid #ddd;">戻り時間</th>
-            <th style="padding:6px;border:1px solid #ddd;">使用例</th>
+        <p class="u-mt-16 u-mb-8"><strong>🎨 ステータスの選択（色分けされます）</strong></p>
+        <table class="status-table">
+          <tr>
+            <th>ステータス</th>
+            <th>色</th>
+            <th>戻り時間</th>
+            <th>使用例</th>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">在席</td>
-            <td style="padding:6px;border:1px solid #ddd;">無色（白）</td>
-            <td style="padding:6px;border:1px solid #ddd;">不要</td>
-            <td style="padding:6px;border:1px solid #ddd;">デスクにいるとき</td>
+            <td>在席</td>
+            <td>無色（白）</td>
+            <td>不要</td>
+            <td>デスクにいるとき</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">外出</td>
-            <td style="padding:6px;border:1px solid #ddd;">🟠 オレンジ</td>
-            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
-            <td style="padding:6px;border:1px solid #ddd;">銀行、郵便局など</td>
+            <td>外出</td>
+            <td>🟠 オレンジ</td>
+            <td><strong>必須</strong></td>
+            <td>銀行、郵便局など</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">在宅勤務</td>
-            <td style="padding:6px;border:1px solid #ddd;">🟣 紫</td>
-            <td style="padding:6px;border:1px solid #ddd;">不要</td>
-            <td style="padding:6px;border:1px solid #ddd;">テレワーク中</td>
+            <td>在宅勤務</td>
+            <td>🟣 紫</td>
+            <td>不要</td>
+            <td>テレワーク中</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">出張</td>
-            <td style="padding:6px;border:1px solid #ddd;">🔵 水色</td>
-            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
-            <td style="padding:6px;border:1px solid #ddd;">他拠点や客先へ</td>
+            <td>出張</td>
+            <td>🔵 水色</td>
+            <td><strong>必須</strong></td>
+            <td>他拠点や客先へ</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">研修</td>
-            <td style="padding:6px;border:1px solid #ddd;">🟢 緑</td>
-            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
-            <td style="padding:6px;border:1px solid #ddd;">研修・セミナー参加</td>
+            <td>研修</td>
+            <td>🟢 緑</td>
+            <td><strong>必須</strong></td>
+            <td>研修・セミナー参加</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">健康診断</td>
-            <td style="padding:6px;border:1px solid #ddd;">🩷 ピンク</td>
-            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
-            <td style="padding:6px;border:1px solid #ddd;">健康診断受診中</td>
+            <td>健康診断</td>
+            <td>🩷 ピンク</td>
+            <td><strong>必須</strong></td>
+            <td>健康診断受診中</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">コアドック</td>
-            <td style="padding:6px;border:1px solid #ddd;">💜 薄紫</td>
-            <td style="padding:6px;border:1px solid #ddd;"><strong>必須</strong></td>
-            <td style="padding:6px;border:1px solid #ddd;">コアドック受診中</td>
+            <td>コアドック</td>
+            <td>💜 薄紫</td>
+            <td><strong>必須</strong></td>
+            <td>コアドック受診中</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">帰宅</td>
-            <td style="padding:6px;border:1px solid #ddd;">⚪ 灰色</td>
-            <td style="padding:6px;border:1px solid #ddd;">不要</td>
-            <td style="padding:6px;border:1px solid #ddd;">退社済み</td>
+            <td>帰宅</td>
+            <td>⚪ 灰色</td>
+            <td>不要</td>
+            <td>退社済み</td>
           </tr>
           <tr>
-            <td style="padding:6px;border:1px solid #ddd;">休み</td>
-            <td style="padding:6px;border:1px solid #ddd;">🔴 赤</td>
-            <td style="padding:6px;border:1px solid #ddd;">不要</td>
-            <td style="padding:6px;border:1px solid #ddd;">休暇・欠勤</td>
+            <td>休み</td>
+            <td>🔴 赤</td>
+            <td>不要</td>
+            <td>休暇・欠勤</td>
           </tr>
         </table>
 
         <p style="margin:16px 0 8px 0;"><strong>⏰ 戻り時間の入力（外出、出張、研修などの場合）</strong></p>
         <ol style="line-height:1.8;">
-          <li>ステータスで「外出」「出張」「研修」「健康診断」「コアドック」を選ぶと、戻り時間が<strong style="color:#d00;">必須</strong>になります</li>
+          <li>ステータスで「外出」「出張」「研修」「健康診断」「コアドック」を選ぶと、戻り時間が<strong class="u-text-red">必須</strong>になります</li>
           <li>「戻り時間」のドロップダウンをクリックして選択（07:00〜22:00、30分刻み）</li>
           <li>⚠️ 未入力の場合は赤枠で表示されます（必ず入力してください）</li>
         </ol>
@@ -596,7 +596,7 @@
           <li>別のイベントを選択すると、表示が切り替わります</li>
         </ul>
 
-        <div style="background:#fff3cd;padding:12px;margin:12px 0;border-left:4px solid #ffc107;border-radius:4px;">
+        <div class="manual-alert manual-alert-warning">
           <strong>💡 ヒント</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>イベントの<strong>登録・編集・削除</strong>は管理者のみが行えます</li>
@@ -653,7 +653,7 @@
         </ul>
 
         <h5>🔄 6. 自動更新について（重要）</h5>
-        <div style="background:#fff3cd;padding:12px;margin:12px 0;border-left:4px solid #ffc107;border-radius:4px;">
+        <div class="manual-alert manual-alert-warning">
           <strong>⚡ リアルタイム同期</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>✅ あなたが入力した内容は、<strong>約1秒後</strong>に自動的に保存されます</li>
@@ -717,7 +717,7 @@
           <li>✅ 選択した日のステータスが自動的に「休み」（または「休暇」「有給」など）になり、備考欄に休暇タイトルが表示されます</li>
         </ol>
 
-        <div style="background:#fff3cd;padding:10px;margin:10px 0;border-left:3px solid #ffc107;border-radius:3px;">
+        <div class="manual-hint">
           <strong>💡 操作のコツ</strong>
           <ul style="margin:6px 0;line-height:1.6;">
             <li><strong>連続した日付を選択</strong>：PCではドラッグ操作が便利です（例：5月3日〜5月7日まで一度に選択）</li>
@@ -727,7 +727,7 @@
           </ul>
         </div>
 
-        <div style="background:#e7f8e7;padding:12px;margin:12px 0;border-left:4px solid #4ade80;border-radius:4px;">
+        <div class="manual-alert manual-alert-success">
           <strong>💡 長期休暇カレンダーの便利な機能</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>✅ <strong>自動保存</strong>：選択した日は保存ボタンを押すと即座に反映され、データベースに保存されます</li>
@@ -813,7 +813,7 @@
       <section id="manualAdmin" class="manual-section manual-tab-content">
         <h4>⚙️ 管理者マニュアル</h4>
 
-        <div style="background:#fff3cd;padding:12px;margin:12px 0;border-left:4px solid #ffc107;border-radius:4px;">
+        <div class="manual-alert manual-alert-warning">
           <strong>🔐 管理者ログインについて</strong><br>
           管理パネルを表示するには、<strong>管理者パスワード</strong>でログインしてください。<br>
           一般ユーザーパスワードではログインできても「管理」ボタンは表示されません。
@@ -827,7 +827,7 @@
           <li>「CSVエクスポート」セクションの「ダウンロード」ボタンをクリック</li>
           <li>✅ ファイル <code>presence_<拠点ID>.csv</code> がダウンロードされます</li>
         </ol>
-        <p style="margin:8px 0;color:#d00;font-weight:bold;">⚠️ 重要：CSVインポート前に必ずエクスポートでバックアップを取ってください！</p>
+        <p class="u-mt-8 u-text-red u-bold">⚠️ 重要：CSVインポート前に必ずエクスポートでバックアップを取ってください！</p>
 
         <h5>📥 2. CSVインポート - 名簿の一括登録・更新</h5>
         <p><strong>用途</strong>：Excelで編集した名簿を一括で取り込みます（名簿全体が置き換わります）</p>
@@ -844,7 +844,7 @@
 
         <p style="margin:12px 0 8px 0;"><strong>操作手順</strong></p>
         <ol style="line-height:1.8;">
-          <li><strong style="color:#d00;">【重要】まずエクスポートでバックアップを取る</strong></li>
+          <li><strong class="u-text-red">【重要】まずエクスポートでバックアップを取る</strong></li>
           <li>ダウンロードしたCSVファイルをExcelで開いて編集</li>
           <li>管理パネルの「CSVインポート」セクションで「ファイルを選択」をクリック</li>
           <li>編集したCSVファイルを選択</li>
@@ -852,7 +852,7 @@
           <li>✅「インポート完了」と表示されたら成功です</li>
         </ol>
 
-        <div style="background:#f8d7da;padding:12px;margin:12px 0;border-left:4px solid #dc3545;border-radius:4px;">
+        <div class="manual-alert manual-alert-danger">
           <strong>⚠️ 注意事項</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>インポートすると<strong>名簿全体が置き換わります</strong>（部分更新はできません）</li>
@@ -887,7 +887,7 @@
         <h5>📢 5. お知らせ管理</h5>
         <p><strong>用途</strong>：拠点のメンバー全員に重要な情報を掲示します</p>
 
-        <div style="background:#e7f8e7;padding:12px;margin:12px 0;border-left:4px solid #4ade80;border-radius:4px;">
+        <div class="manual-alert manual-alert-success">
           <strong>✨ 自動読み込み機能</strong><br>
           管理パネルを開くと、現在のお知らせが<strong>自動的に表示</strong>されます。<br>
           「現在のお知らせを読み込み」ボタンを押す必要はありません。
@@ -915,7 +915,7 @@
           <li>確認ダイアログで「OK」をクリック</li>
         </ol>
 
-        <div style="background:#d1ecf1;padding:12px;margin:12px 0;border-left:4px solid #0c5460;border-radius:4px;">
+        <div class="manual-alert manual-alert-teal">
           <strong>💡 お知らせ機能のポイント</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>お知らせは<strong>拠点ごと</strong>に独立して管理されます</li>
@@ -938,7 +938,7 @@
         <h5>📅 5. イベント管理</h5>
         <p><strong>用途</strong>：GW、年末年始、夏季休暇など、複数日にわたる休暇を事前に登録・管理します</p>
 
-        <div style="background:#e7f8e7;padding:12px;margin:12px 0;border-left:4px solid #4ade80;border-radius:4px;">
+        <div class="manual-alert manual-alert-success">
           <strong>✨ イベント機能の特長</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>ガントチャート形式で休暇期間とメンバーを視覚的に管理できます</li>
@@ -992,7 +992,7 @@
           <li>上にあるイベントほど優先度が高く、ユーザーが選択する際のリストの上位に表示されます</li>
           <li>並び替え後、<strong>自動的に保存</strong>されます（保存ボタンを押す必要はありません）</li>
         </ol>
-        <div style="background:#fff3cd;padding:10px;margin:8px 0;border-left:3px solid #ffc107;border-radius:3px;">
+        <div class="manual-hint">
           <strong>💡 ヒント</strong>：現在進行中のイベント（例：GW、年末年始）を上位に配置すると、ユーザーが選択しやすくなります。
         </div>
 
@@ -1004,7 +1004,7 @@
           <li><strong>選択肢</strong>：「休み」「休暇」「特休」「有給」「代休」などから選択可能</li>
           <li><strong>自動保存</strong>：選択すると即座に保存され、ユーザーの画面に反映されます</li>
         </ul>
-        <div style="background:#e7f8e7;padding:10px;margin:8px 0;border-left:3px solid #4ade80;border-radius:3px;">
+        <div class="manual-alert manual-alert-success">
           <strong>使用例</strong>
           <ul style="margin:4px 0;line-height:1.6;">
             <li>「GW期間休暇」→ 種別：<strong>「休暇」</strong>（通常の長期休暇）</li>
@@ -1041,7 +1041,7 @@
           <li>設定後、<strong>「💾 作成/更新」</strong>ボタンをクリックすると保存されます</li>
           <li>✅ ユーザーがそのイベントを選択すると、設定した日が自動的に「休み」ステータスになります</li>
         </ol>
-        <div style="background:#f8d7da;padding:10px;margin:8px 0;border-left:3px solid #dc3545;border-radius:3px;">
+        <div class="manual-alert manual-alert-danger">
           <strong>⚠️ 重要</strong>：イベントカレンダーでユーザー自身が変更した休暇日は、<strong>ユーザー個人のデータ</strong>として保存されます。<br>
           管理者が後からガントチャートを編集しても、既にユーザーが保存した個人設定は上書きされません。
         </div>
@@ -1054,7 +1054,7 @@
           <li>複数のイベントを同時に「表示」にできますが、ユーザーが選択できるのは1つだけです</li>
         </ul>
 
-        <div style="background:#d1ecf1;padding:12px;margin:12px 0;border-left:4px solid #0c5460;border-radius:4px;">
+        <div class="manual-alert manual-alert-teal">
           <strong>💡 イベント機能のポイント</strong>
           <ul style="margin:8px 0;line-height:1.8;">
             <li>イベントは<strong>拠点ごと</strong>に独立して管理されます</li>
@@ -1152,35 +1152,35 @@
   </div>
 
   <!-- ログイン -->
-  <div id="login" class="login" style="display:none">
+  <div id="login" class="login u-hidden">
     <form class="card" onsubmit="event.preventDefault();">
       <h2>在席確認表</h2>
       <p>拠点を選び、パスワードを入力してください</p>
-      <input type="text" name="username" id="dummyUsername" tabindex="-1" aria-hidden="true"
-        style="position:fixed; left:-9999px; opacity:0;" autocomplete="username">
+      <input type="text" name="username" id="dummyUsername" tabindex="-1" aria-hidden="true" class="u-visually-hidden"
+        autocomplete="username">
       <select id="officeSel" aria-label="拠点"
         onchange="document.getElementById('dummyUsername').value = this.options[this.selectedIndex].text"></select>
       <input type="password" id="pw" placeholder="Password" autocomplete="current-password" />
       <button id="btnLogin" type="button">ログイン</button>
-      <div id="loginMsg" style="color:#0073bb;margin-top:8px" aria-live="polite"></div>
+      <div id="loginMsg" class="login-msg" aria-live="polite"></div>
     </form>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <!-- お知らせエリア -->
-  <div id="noticesArea" class="notices-area" style="display:none">
+  <div id="noticesArea" class="notices-area u-hidden">
     <div class="notices-container">
       <div class="notices-header">
         <h3 class="notices-title">📢 お知らせ<span class="notices-hint">（タイトル行や📢ボタンをクリックすると折りたためます）</span></h3>
-        <span id="noticesSummary" class="notices-summary" style="display:none"></span>
+        <span id="noticesSummary" class="notices-summary u-hidden"></span>
       </div>
       <div id="noticesList" class="notices-list"></div>
     </div>
   </div>
 
   <div class="wrap">
-    <div id="board" class="board" style="display:none"></div>
+    <div id="board" class="board u-hidden"></div>
   </div>
   <div id="diag" class="diag"></div>
   <script src="js/config.js"></script>
