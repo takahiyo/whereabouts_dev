@@ -1,0 +1,1204 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>在席確認表</title>
+
+  <!-- 強めのキャッシュ抑止（HTMLに効く） -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- CSP：Worker への POST を許可 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self';
+               script-src 'self' https://www.gstatic.com;
+               connect-src 'self' https://presence-proxy-test.taka-hiyo.workers.dev https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://www.gstatic.com;
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               font-src 'self';
+               object-src 'none';
+               base-uri 'self';
+               form-action 'self'">
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+
+<body>
+  <header>
+    <div class="title-wrap">
+      <button id="titleBtn" class="title-btn" aria-haspopup="true" aria-expanded="false"
+        aria-controls="groupMenu">在席確認表</button>
+      <div id="groupMenu" class="grp-menu" role="menu" aria-labelledby="titleBtn">
+        <h4 id="groupMenuTitle">グループにジャンプ</h4>
+        <ul id="groupMenuList"></ul>
+      </div>
+    </div>
+    <button id="adminBtn" class="admin-btn" title="管理">管理</button>
+    <input id="nameFilter" class="name-filter" type="search" placeholder="氏名検索（入力と同時に絞り込み）" aria-label="氏名検索"
+      autocomplete="off" name="member_search_query" />
+    <select id="statusFilter" class="status-filter" aria-label="ステータスで絞り込み"></select>
+    <button id="noticesBtn" class="notices-btn" title="お知らせ">お知らせ</button>
+    <button id="eventBtn" class="event-btn" title="イベント">📅 イベント</button>
+    <button id="toolsBtn" class="tools-btn" title="ツール">🛠️ ツール</button>
+    <button id="logoutBtn" class="logout-btn" title="ログオフ">ログオフ</button>
+    <button id="manualBtn" class="manual-btn" title="マニュアル">マニュアル</button>
+  </header>
+
+  <!-- 管理モーダル -->
+  <div id="adminModal" class="admin-modal" aria-modal="true" role="dialog">
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <div class="admin-modal-header-row">
+          <h3>管理パネル</h3><button id="adminClose">閉じる</button>
+        </div>
+
+        <!-- タブナビゲーション -->
+        <div class="admin-tabs">
+          <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="basic">⚙️ 基本設定</button>
+            <button class="tab-btn" data-tab="members">👥 メンバー管理</button>
+            <button class="tab-btn" data-tab="notices">📢 お知らせ管理</button>
+            <button class="tab-btn" data-tab="events">📅 イベント管理</button>
+            <button class="tab-btn" data-tab="tools">🛠️ ツール管理</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card-body">
+
+        <!-- タブパネル1: 基本設定 -->
+        <div id="tabBasic" class="tab-panel active" data-tab="basic">
+          <div class="admin-grid">
+            <div class="admin-box admin-box-stacked">
+              <h4>📁 CSV管理</h4>
+              <div class="admin-subsection">
+                <h5>📥 在席確認表リスト エクスポート</h5>
+                <div class="admin-row"><button id="btnExport">ダウンロード</button></div>
+                <div class="admin-note">形式：グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</div>
+                <div class="admin-note u-font-sm u-text-gray">※従来フォーマット（携帯番号・Email列なし）も引き続き対応</div>
+              </div>
+              <div class="admin-subsection">
+                <h5>📤 在席確認表リスト インポート</h5>
+                <div class="admin-row"><input type="file" id="csvFile" accept=".csv,text/csv" /><button
+                    id="btnImport">取り込み</button></div>
+              </div>
+            </div>
+
+            <div class="admin-box admin-box-stacked">
+              <h4>🏢 拠点設定</h4>
+              <div class="admin-subsection">
+                <h5>拠点名の変更</h5>
+                <div class="admin-row"><input id="renameOfficeName" placeholder="新しい拠点名" /><button
+                    id="btnRenameOffice">変更</button></div>
+              </div>
+              <div class="admin-subsection">
+                <h5>拠点パスワードの変更</h5>
+                <div class="admin-row">
+                  <input id="setPw" placeholder="新パスワード（任意）" />
+                  <input id="setAdminPw" placeholder="新管理者PW（任意）" />
+                  <button id="btnSetPw">更新</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- タブパネル: メンバー管理 -->
+        <div id="tabMembers" class="tab-panel" data-tab="members">
+          <div class="member-save-bar">
+            <button id="btnMemberSave" class="btn-primary">💾 保存</button>
+          </div>
+          <div class="members-panel">
+            <div class="admin-box" id="memberEditTop">
+              <div class="admin-box-header">
+                <h4>👥 メンバー一覧・編集</h4>
+              </div>
+              <div class="admin-note">ドラッグまたは↑↓ボタンで並び替え、編集ボタンで詳細を更新できます。</div>
+              <form id="memberEditForm" class="member-edit-form member-inline-form">
+                <input type="hidden" id="memberEditId" />
+                <div class="member-edit-grid">
+                  <label>氏名（必須）
+                    <input id="memberEditName" type="text" required placeholder="例：山田 太郎" />
+                  </label>
+                  <label>所属グループ（必須）
+                    <input id="memberEditGroup" type="text" list="memberGroupOptions" placeholder="既存グループを選択 or 入力" />
+                    <datalist id="memberGroupOptions"></datalist>
+                  </label>
+                  <label>内線
+                    <input id="memberEditExt" type="tel" inputmode="numeric" placeholder="数字のみ" />
+                  </label>
+                  <label>携帯
+                    <input id="memberEditMobile" type="tel" inputmode="tel" placeholder="例：090-1234-5678" />
+                  </label>
+                  <label>Email
+                    <input id="memberEditEmail" type="email" placeholder="example@example.com" />
+                  </label>
+                </div>
+                <div class="member-edit-actions">
+                  <div class="member-edit-actions-left">
+                    <span id="memberEditModeLabel" class="member-edit-mode">新規追加／編集フォーム</span>
+                  </div>
+                  <div class="member-edit-actions-right">
+                    <button type="button" id="memberEditReset" class="btn-secondary">フォームをクリア</button>
+                    <button type="submit" class="btn-primary">💾 追加／更新</button>
+                  </div>
+                </div>
+              </form>
+              <div class="admin-subsection">
+                <h5>📦 グループ並び替え</h5>
+                <div class="admin-note">↑↓ボタンでグループの並び順を変更できます。保存時はメンバー順を維持したままグループ順のみ反映されます。</div>
+                <div id="groupOrderList" class="group-order-list"></div>
+                <div id="groupOrderEmpty" class="admin-note u-mt-6">グループがありません。</div>
+              </div>
+              <div class="member-filter-row">
+                <label for="memberFilterInput" class="member-filter-label">氏名フィルター</label>
+                <div class="member-filter-controls">
+                  <input id="memberFilterInput" type="search" placeholder="在席確認表の氏名で絞り込み" aria-label="氏名フィルター" />
+                  <button id="btnMemberFilterClear" class="btn-secondary" type="button">クリア</button>
+                </div>
+              </div>
+              <div class="member-table-wrap">
+                <table class="member-table">
+                  <thead>
+                    <tr>
+                      <th>順番</th>
+                      <th>グループ</th>
+                      <th>氏名</th>
+                      <th>内線</th>
+                      <th>携帯</th>
+                      <th>Email</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="memberTableBody">
+                    <tr>
+                      <td colspan="7" class="u-text-center u-text-gray">読み込み待ち</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- タブパネル2: お知らせ管理 -->
+        <div id="tabNotices" class="tab-panel" data-tab="notices">
+          <div class="notices-manager">
+            <div class="notices-manager-toolbar">
+              <div class="notices-manager-info">
+                <p>お知らせの順番はドラッグ&ドロップまたは↑↓ボタンで入れ替えられます。上にあるものから順に表示されます。</p>
+                <p>「表示する」チェックで公開/非公開を切り替えられます。削除ボタンを押すと確認ダイアログが表示されます。</p>
+              </div>
+              <div class="notices-manager-actions">
+                <button id="btnAddNotice" class="btn-primary">➕ お知らせを追加</button>
+                <button id="btnLoadNotices" class="btn-secondary">🔄 読み込み</button>
+                <button id="btnSaveNotices" class="btn-success">💾 保存</button>
+              </div>
+            </div>
+
+            <div class="notices-manager-scroll">
+              <div id="noticesEditor" class="notices-editor"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- タブパネル3: イベント管理 -->
+        <div id="tabEvents" class="tab-panel" data-tab="events">
+          <div class="vacation-grid">
+            <div class="admin-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <h4 style="margin:0;">登録済みのイベント</h4>
+                <button id="btnExportEvent" class="btn-secondary u-font-13">📄 イベントをエクスポート</button>
+              </div>
+              <div class="vacation-table-wrap">
+                <table class="vacation-table">
+                  <thead>
+                    <tr>
+                      <th class="u-w-44">並び</th>
+                      <th>タイトル</th>
+                      <th>期間</th>
+                      <th>対象拠点</th>
+                      <th>休暇固定（種別）</th>
+                      <th>色</th>
+                      <th>備考</th>
+                      <th>表示</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="vacationListBody">
+                    <tr>
+                      <td colspan="9" class="u-text-center u-text-gray">読み込み待ち</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="admin-box">
+              <h4>イベントの作成 / 更新</h4>
+              <div class="vacation-form">
+                <div class="vacation-row">
+                  <label>対象拠点
+                    <select id="vacationOffice" aria-label="対象拠点"></select>
+                  </label>
+                </div>
+                <div class="vacation-row">
+                  <label>タイトル
+                    <input id="vacationTitle" type="text" placeholder="例: GW期間休暇" />
+                  </label>
+                </div>
+                <div class="vacation-row vacation-row-two-cols">
+                  <label>開始日
+                    <input id="vacationStart" type="date" />
+                  </label>
+                  <label>終了日
+                    <input id="vacationEnd" type="date" />
+                  </label>
+                </div>
+                <div class="vacation-row vacation-row-inline">
+                  <label>お知らせを選択
+                    <select id="vacationNotice" aria-label="イベントに紐づけるお知らせ"></select>
+                  </label>
+                  <div class="vacation-inline-actions">
+                    <button id="btnCreateNoticeFromEvent" class="btn-secondary">➕ お知らせ新規作成</button>
+                  </div>
+                </div>
+                <div class="vacation-row vacation-row-two-cols">
+                  <label>
+                    種別
+                    <input id="vacationTypeText" type="text" value="休暇固定（一覧で切替）" readonly />
+                    <span class="vacation-helper">※ 種別は一覧の「休暇固定」列で変更できます。</span>
+                  </label>
+                  <label>色/カテゴリー
+                    <select id="vacationColor" aria-label="色/カテゴリー">
+                      <option value="amber">サニー</option>
+                      <option value="blue">ブルー</option>
+                      <option value="green">グリーン</option>
+                      <option value="pink">ピンク</option>
+                      <option value="purple">パープル</option>
+                      <option value="teal">ティール</option>
+                      <option value="gray">グレー</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="vacation-row u-hidden">
+                  <label>メンバーの休暇指定（ガントで自動入力）
+                    <input id="vacationMembersBits" type="text" placeholder="ガント入力で自動反映されます" readonly />
+                    <span class="vacation-helper">※ 手入力は不要です。下のガント表で休暇にしたいメンバーと日付をONにしてください。</span>
+                  </label>
+                </div>
+                <div class="vacation-actions">
+                  <button id="btnVacationSave" class="btn-primary">💾 作成/更新</button>
+                  <button id="btnVacationDelete" class="btn-danger">🗑️ 削除</button>
+                  <button id="btnVacationClear" class="btn-secondary">🧹 入力クリア</button>
+                  <button id="btnVacationReload" class="btn-secondary">🔄 一覧更新</button>
+                </div>
+                <div class="vacation-row u-hidden">
+                  <div class="vacation-gantt-head">
+                    <div class="vacation-gantt-title">ガント入力</div>
+                    <div class="vacation-gantt-help">開始日/終了日に合わせて日付スロットを生成し、セルをクリック/ドラッグ（スマホはタップ）するとビットが切り替わります。</div>
+                  </div>
+                  <div id="vacationGantt" class="vacation-gantt" aria-live="polite"></div>
+                </div>
+                <div class="vacation-row u-hidden">
+                  <label>ID（自動設定）
+                    <input id="vacationId" type="text" readonly placeholder="新規作成時は空欄のまま" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- タブパネル4: ツール管理 -->
+        <div id="tabTools" class="tab-panel" data-tab="tools">
+          <div class="tools-manager">
+            <div class="tools-manager-toolbar">
+              <div class="tools-manager-info">
+                <p>ツールの順番はドラッグ&ドロップまたは↑↓ボタンで入れ替えられます。上にあるものから順に表示されます。</p>
+                <p>タイトルとURL、備考を入力できます。表示をOFFにしたツールは利用者画面に表示されません。</p>
+              </div>
+              <div class="tools-manager-actions">
+                <button id="btnAddTool" class="btn-primary">➕ ツールを追加</button>
+                <button id="btnLoadTools" class="btn-secondary">🔄 読み込み</button>
+                <button id="btnSaveTools" class="btn-success">💾 保存</button>
+              </div>
+            </div>
+
+            <div class="tools-manager-scroll">
+              <div id="toolsEditor" class="tools-editor"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- イベントモーダル -->
+  <div id="eventModal" class="admin-modal event-modal" aria-modal="true" role="dialog" aria-label="イベント表示設定">
+    <div class="admin-card">
+      <div class="event-modal-header">
+        <h3 class="event-modal-title">イベントカレンダー</h3>
+        <button id="eventClose">閉じる</button>
+      </div>
+
+      <!-- タブパネル: イベント選択 -->
+      <div id="tabEvent" class="tab-panel active">
+        <div class="vacation-view">
+          <div class="event-select-toolbar">
+            <label class="event-select-label">
+              <span>イベントを選択:</span>
+              <select id="eventSelectDropdown" class="event-select-dropdown"></select>
+            </label>
+            <button id="btnShowEventNotice" class="btn-secondary btn-show-event-notice u-hidden">📄
+              イベントの内容を表示</button>
+          </div>
+          <div id="vacationRadioList" class="vacation-radio-list u-hidden"></div>
+          <div id="eventGanttWrap" class="vacation-gantt-head">
+            <div class="vacation-gantt-sticky-header">
+              <div class="event-toolbar">
+                <div class="event-toolbar__hint">
+                  <span class="vacation-gantt-touch-hint">セルをクリック/ドラッグ（スマホはタップ）するとON/OFFを切り替えられます。</span>
+                  <span id="eventColorManualHint" class="event-color-manual-hint u-hidden" role="status"
+                    aria-live="polite"></span>
+                </div>
+                <div class="vacation-actions u-mb-0 u-flex-end-gap">
+                  <button id="btnEventPrint" class="btn-secondary">🖨️ 印刷</button>
+                </div>
+              </div>
+              <div id="eventGroupJumps" class="vacation-group-jumps u-hidden" aria-label="グループジャンプ">
+                <span class="jump-label">グループ移動</span>
+                <div class="jump-buttons" aria-label="グループジャンプボタン"></div>
+                <label class="jump-select u-hidden" aria-label="グループジャンプ選択">
+                  <span class="sr-only">グループを選択</span>
+                  <select id="eventGroupJumpSelect"></select>
+                </label>
+              </div>
+              <div id="eventLegendModal" class="event-legend event-legend-compact" aria-live="polite"></div>
+            </div>
+            <div id="eventPrintInfo" class="u-hidden"></div>
+            <div id="eventGantt" class="vacation-gantt" aria-live="polite"></div>
+            <input id="eventStart" type="hidden" />
+            <input id="eventEnd" type="hidden" />
+            <input id="eventBits" type="hidden" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- お知らせプレビューモーダル（イベント経由専用） -->
+  <div id="noticeModal" class="admin-modal notice-modal" aria-modal="true" role="dialog"
+    aria-labelledby="noticeModalTitle" aria-hidden="true">
+    <div class="admin-card notice-modal-card">
+      <div class="notice-modal-header">
+        <h3 id="noticeModalTitle">関連お知らせ</h3>
+        <button id="noticeModalClose" aria-label="閉じる">閉じる</button>
+      </div>
+      <div id="noticeModalBody" class="notice-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ツールモーダル -->
+  <div id="toolsModal" class="admin-modal tools-modal" aria-modal="true" role="dialog"
+    aria-labelledby="toolsModalTitle">
+    <div class="admin-card tools-modal-card">
+      <div class="tools-modal-header">
+        <h3 id="toolsModalTitle">🛠️ ツール一覧</h3>
+        <button id="toolsModalClose" aria-label="閉じる">閉じる</button>
+      </div>
+      <div id="toolsList" class="tools-list">
+        <div class="tools-empty">ツール情報を読み込み中です…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- マニュアルモーダル -->
+  <div id="manualModal" class="manual-modal" aria-modal="true" role="dialog" aria-labelledby="manualTitle">
+    <div class="manual-card" role="document">
+      <div>
+        <div class="admin-modal-header-row u-mb-12">
+          <h3 id="manualTitle" class="u-m-0">マニュアル</h3>
+          <button id="manualClose" aria-label="閉じる">閉じる</button>
+        </div>
+        <div class="manual-tabs">
+          <button class="manual-tab-btn active" data-tab="user">📖 ユーザー向け</button>
+          <button class="manual-tab-btn" data-tab="admin">⚙️ 管理者向け</button>
+        </div>
+      </div>
+
+      <section id="manualUser" class="manual-section manual-tab-content active">
+        <h4>📖 ユーザーマニュアル - 初めての方へ</h4>
+
+        <div class="manual-alert manual-alert-info">
+          <strong>💡 このシステムについて</strong><br>
+          在席確認表は、チームメンバーの在席状況をリアルタイムで共有するシステムです。<br>
+          入力した内容は自動的に保存され、他の人のPCやスマートフォンにも即座に反映されます。
+        </div>
+
+        <h5>🔐 1. 初回ログイン（管理者からパスワードを受け取ってください）</h5>
+        <ol class="u-lh-18">
+          <li><strong>拠点を選択</strong>：ドロップダウンから所属する拠点（営業所）を選びます</li>
+          <li><strong>パスワードを入力</strong>：管理者から教えてもらったパスワードを入力します</li>
+          <li><strong>「ログイン」ボタンをクリック</strong></li>
+          <li>✅ ログイン成功すると、在席確認表が表示されます</li>
+        </ol>
+        <p class="manual-subtext">
+          ※ログイン状態は1時間保持され、自動的に延長されます。ブラウザを閉じた場合は再ログインが必要です。
+        </p>
+
+        <h5>👁️ 2. 画面の見方</h5>
+        <ul class="u-lh-18">
+          <li><strong>画面上部（ヘッダー）</strong>：
+            <ul class="u-mt-4">
+              <li>📍 <strong>タイトル</strong>：拠点名が表示されます（クリックするとグループ一覧メニューが開きます）</li>
+              <li>🔍 <strong>氏名検索</strong>：特定の人を探すときに使います</li>
+              <li>🎯 <strong>ステータス絞り込み</strong>：「外出中の人だけ」など、条件で絞り込めます</li>
+              <li>📢 <strong>お知らせ</strong>：お知らせがある場合に表示。クリックで折りたたみ/展開を切り替えます</li>
+              <li>⚙️ <strong>管理</strong>：管理者のみ表示されます</li>
+              <li>🚪 <strong>ログオフ</strong>：ログアウトします</li>
+              <li>📖 <strong>マニュアル</strong>：このマニュアルを表示します</li>
+            </ul>
+          </li>
+          <li><strong>メイン画面</strong>：
+            <ul class="u-mt-4">
+              <li>チーム（グループ）ごとに表が表示されます</li>
+              <li>各行がメンバー1人の情報です</li>
+              <li>スマートフォンでは自動的にカード表示に切り替わります</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h5>✍️ 3. 基本操作 - 自分の状態を更新する</h5>
+
+        <p class="u-my-8"><strong>📝 業務時間の入力</strong></p>
+        <ol class="u-lh-18">
+          <li>自分の行の「業務時間」欄をクリック</li>
+          <li>直接入力するか、表示される候補リストから選択（例：<code>09:00-17:30</code>）</li>
+          <li>✅ 入力が完了すると、約1秒後に自動保存されます（保存ボタンは不要です）</li>
+        </ol>
+
+        <p class="u-mt-16 u-mb-8"><strong>🎨 ステータスの選択（色分けされます）</strong></p>
+        <table class="status-table">
+          <tr>
+            <th>ステータス</th>
+            <th>色</th>
+            <th>戻り時間</th>
+            <th>使用例</th>
+          </tr>
+          <tr>
+            <td>在席</td>
+            <td>無色（白）</td>
+            <td>不要</td>
+            <td>デスクにいるとき</td>
+          </tr>
+          <tr>
+            <td>外出</td>
+            <td>🟠 オレンジ</td>
+            <td><strong>必須</strong></td>
+            <td>銀行、郵便局など</td>
+          </tr>
+          <tr>
+            <td>在宅勤務</td>
+            <td>🟣 紫</td>
+            <td>不要</td>
+            <td>テレワーク中</td>
+          </tr>
+          <tr>
+            <td>出張</td>
+            <td>🔵 水色</td>
+            <td><strong>必須</strong></td>
+            <td>他拠点や客先へ</td>
+          </tr>
+          <tr>
+            <td>研修</td>
+            <td>🟢 緑</td>
+            <td><strong>必須</strong></td>
+            <td>研修・セミナー参加</td>
+          </tr>
+          <tr>
+            <td>健康診断</td>
+            <td>🩷 ピンク</td>
+            <td><strong>必須</strong></td>
+            <td>健康診断受診中</td>
+          </tr>
+          <tr>
+            <td>コアドック</td>
+            <td>💜 薄紫</td>
+            <td><strong>必須</strong></td>
+            <td>コアドック受診中</td>
+          </tr>
+          <tr>
+            <td>帰宅</td>
+            <td>⚪ 灰色</td>
+            <td>不要</td>
+            <td>退社済み</td>
+          </tr>
+          <tr>
+            <td>休み</td>
+            <td>🔴 赤</td>
+            <td>不要</td>
+            <td>休暇・欠勤</td>
+          </tr>
+        </table>
+
+        <p style="margin:16px 0 8px 0;"><strong>⏰ 戻り時間の入力（外出、出張、研修などの場合）</strong></p>
+        <ol style="line-height:1.8;">
+          <li>ステータスで「外出」「出張」「研修」「健康診断」「コアドック」を選ぶと、戻り時間が<strong class="u-text-red">必須</strong>になります</li>
+          <li>「戻り時間」のドロップダウンをクリックして選択（07:00〜22:00、30分刻み）</li>
+          <li>⚠️ 未入力の場合は赤枠で表示されます（必ず入力してください）</li>
+        </ol>
+        <p style="margin:8px 0;color:#666;font-size:0.9em;">
+          💡 ヒント：「在席」「在宅勤務」「帰宅」「休み」を選ぶと、戻り時間と備考が自動的にクリアされます
+        </p>
+
+        <p style="margin:16px 0 8px 0;"><strong>📌 備考の入力（任意）</strong></p>
+        <ul style="line-height:1.8;">
+          <li>「備考」欄をクリックして、自由に入力できます</li>
+          <li>候補から選ぶこともできます：<strong>直出</strong>、<strong>直帰</strong>、<strong>直出・直帰</strong></li>
+          <li>空白にしたい場合は「（空白）」を選択してください</li>
+        </ul>
+
+        <h5>📅 4. イベントの表示</h5>
+        <p><strong>イベント機能とは</strong></p>
+        <ul style="line-height:1.8;">
+          <li>GW、年末年始、夏季休暇など、複数日にわたる休暇を簡単に管理できます</li>
+          <li>管理者が休暇期間とメンバーを事前に設定しておくことで、休暇中のメンバーがわかりやすくなります</li>
+          <li>イベントが登録されている場合のみ、ヘッダーに「イベント」ボタンが表示されます</li>
+        </ul>
+
+        <p style="margin-top:12px;"><strong>イベントの表示方法</strong></p>
+        <ol style="line-height:1.8;">
+          <li>ヘッダーの<strong>「イベント」</strong>ボタンをクリック</li>
+          <li>登録されているイベントの一覧が表示されます（例：「GW期間休暇」「年末年始休暇」）</li>
+          <li>表示したいイベントをクリックして選択</li>
+          <li>ガントチャート（カレンダー形式の表）が表示され、どのメンバーがいつ休暇なのかを確認できます</li>
+          <li><strong>「表示」</strong>ボタンをクリック → メイン画面で該当メンバーの行が<strong>ハイライト表示</strong>されます</li>
+        </ol>
+
+        <p style="margin-top:12px;"><strong>表示される内容</strong></p>
+        <ul style="line-height:1.8;">
+          <li>休暇中のメンバーの行が色付きでハイライトされます</li>
+          <li>ステータス欄にイベントのタイトル（例：「GW期間休暇」）が表示されます</li>
+          <li>画面上部に「イベント表示中」のバナーが表示されます</li>
+        </ul>
+
+        <p style="margin-top:12px;"><strong>表示を解除する</strong></p>
+        <ul style="line-height:1.8;">
+          <li>イベントモーダルで<strong>「表示クリア」</strong>ボタンをクリックすると、ハイライトが解除されます</li>
+          <li>別のイベントを選択すると、表示が切り替わります</li>
+        </ul>
+
+        <div class="manual-alert manual-alert-warning">
+          <strong>💡 ヒント</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>イベントの<strong>登録・編集・削除</strong>は管理者のみが行えます</li>
+            <li>イベントを設定したい場合は、管理者に問い合わせてください</li>
+            <li>イベントボタンが表示されない場合は、現在登録されているイベントがありません</li>
+          </ul>
+        </div>
+
+        <h5>🔍 5. 他の人の状況を確認する</h5>
+        </h5>
+
+        <p><strong>氏名検索の使い方</strong></p>
+        <ol style="line-height:1.8;">
+          <li>画面上部の検索ボックスに名前を入力（例：「田中」）</li>
+          <li>入力すると同時に、該当する人だけが表示されます</li>
+          <li>検索を解除するには、入力内容を削除してください</li>
+        </ol>
+
+        <p style="margin-top:12px;"><strong>ステータスで絞り込み</strong></p>
+        <ol style="line-height:1.8;">
+          <li>画面上部の「ステータス絞り込み」ドロップダウンをクリック</li>
+          <li>見たいステータスを選択（例：「外出中の人だけ見る」→「外出」を選択）</li>
+          <li>全員表示に戻すには「全て」を選択してください</li>
+        </ol>
+
+        <p style="margin-top:12px;"><strong>グループジャンプ（画面が長い場合）</strong></p>
+        <ol style="line-height:1.8;">
+          <li>画面上部の拠点名（タイトル）をクリック</li>
+          <li>グループ一覧メニューが表示されます</li>
+          <li>行きたいグループをクリックすると、その位置にスクロールします</li>
+        </ol>
+
+        <h5>📢 5. お知らせ機能の使い方</h5>
+        <p><strong>お知らせエリアとは</strong></p>
+        <ul style="line-height:1.8;">
+          <li>管理者が登録した重要なお知らせが、ヘッダーとメイン画面の間に表示されます</li>
+          <li>システムメンテナンス、業務連絡、注意事項などが掲載されます</li>
+          <li>お知らせがない場合は、お知らせエリアとボタンは表示されません</li>
+        </ul>
+
+        <p style="margin-top:12px;"><strong>折りたたみ/展開の切り替え</strong></p>
+        <ol style="line-height:1.8;">
+          <li><strong>初期状態（ログイン直後）</strong>：お知らせは<strong>展開</strong>された状態で表示されます</li>
+          <li><strong>折りたたみ</strong>：ヘッダーの「お知らせ」ボタンをクリック → 最初のお知らせのタイトルと件数のみ表示されます<br>
+            <span style="color:#666;font-size:0.9em;">例：「システムメンテナンスのお知らせ (他2件)」</span>
+          </li>
+          <li><strong>展開</strong>：もう一度「お知らせ」ボタンをクリック → すべてのお知らせが表示されます</li>
+        </ol>
+
+        <p style="margin-top:12px;"><strong>お知らせの更新頻度</strong></p>
+        <ul style="line-height:1.8;">
+          <li>管理者が追加・編集・削除したお知らせは、約30秒ごとに自動的に反映されます</li>
+          <li>すぐに確認したい場合は、ページを再読み込み（F5キー）してください</li>
+        </ul>
+
+        <h5>🔄 6. 自動更新について（重要）</h5>
+        <div class="manual-alert manual-alert-warning">
+          <strong>⚡ リアルタイム同期</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>✅ あなたが入力した内容は、<strong>約1秒後</strong>に自動的に保存されます</li>
+            <li>✅ 他の人が入力した在席状況は、<strong>約10秒ごと</strong>に自動的にあなたの画面に反映されます</li>
+            <li>✅ お知らせや設定の変更は、<strong>約30秒ごと</strong>に自動的に反映されます</li>
+            <li>✅ 保存ボタンや更新ボタンは<strong>不要</strong>です</li>
+            <li>⚠️ 入力中や変換中は、他の人の更新が一時的に保留されます（入力の邪魔になりません）</li>
+          </ul>
+        </div>
+
+        <h5>❓ よくある質問</h5>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 保存ボタンはどこですか？</summary>
+          <p style="margin:8px 0 8px 20px;">A. 保存ボタンはありません。入力すると自動的に約1秒後に保存されます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. お知らせボタンが表示されません</summary>
+          <p style="margin:8px 0 8px 20px;">A. お知らせがない場合、お知らせボタンとお知らせエリアは表示されません。管理者がお知らせを登録すると自動的に表示されます（約30秒以内に反映）。
+          </p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. お知らせが邪魔で画面が見づらい</summary>
+          <p style="margin:8px 0 8px 20px;">A. ヘッダーの「お知らせ」ボタンをクリックすると、お知らせエリアを折りたたむことができます。折りたたむと1行のサマリー表示になります。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 戻り時間が選択できません</summary>
+          <p style="margin:8px 0 8px 20px;">A. ステータスが「在席」「在宅勤務」「帰宅」「休み」の場合、戻り時間は不要なため選択できません。「外出」「出張」などに変更してください。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. スマートフォンでも使えますか？</summary>
+          <p style="margin:8px 0 8px 20px;">A. はい、スマートフォンのブラウザでも利用できます。画面が自動的にカード表示に切り替わります。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 間違えて入力してしまいました</summary>
+          <p style="margin:8px 0 8px 20px;">A. すぐに正しい内容に入力し直してください。約2秒後に自動保存されます。</p>
+        </details>
+
+        <h5>🌴 7. 長期休暇（イベント）機能の使い方</h5>
+        <p><strong>長期休暇機能とは</strong></p>
+        <ul style="line-height:1.8;">
+          <li>管理者が登録した<strong>長期休暇期間（夏季休暇、年末年始、GWなど）</strong>を確認・選択できます</li>
+          <li>自分がどの日に休暇を取るか、<strong>カレンダー上で選択</strong>できます</li>
+          <li>選択した日は自動的にステータスが「休み」（または「休暇」「有給」など）になり、<strong>備考欄に休暇タイトル</strong>が表示されます</li>
+          <li>✅ ログイン時や画面更新時に、<strong>保存した休暇が自動的に適用</strong>されます（毎回設定する必要はありません）</li>
+        </ul>
+
+        <p style="margin-top:12px;"><strong>長期休暇カレンダーの開き方</strong></p>
+        <ol style="line-height:1.8;">
+          <li>画面上部の<strong>「長期休暇」ボタン</strong>をクリック（管理者が設定した長期休暇がある場合のみ表示）</li>
+          <li>長期休暇カレンダーが全画面で開きます</li>
+          <li>複数のイベントがある場合は、リストから選択できます</li>
+        </ol>
+
+        <p style="margin-top:12px;"><strong>休暇日の選択方法</strong></p>
+        <ol style="line-height:1.8;">
+          <li>長期休暇カレンダーを開き、必要に応じて<strong>イベントを選択</strong>します（複数ある場合）</li>
+          <li>カレンダー上で<strong>自分の行</strong>を探します（グループ名と氏名で確認）</li>
+          <li>休暇を取る日の<strong>セルをクリック</strong>（PCの場合はドラッグでも選択可能）</li>
+          <li>選択した日が<strong>青色</strong>になります（もう一度クリックすると解除）</li>
+          <li><strong>「保存」ボタン</strong>をクリック</li>
+          <li>✅ 選択した日のステータスが自動的に「休み」（または「休暇」「有給」など）になり、備考欄に休暇タイトルが表示されます</li>
+        </ol>
+
+        <div class="manual-hint">
+          <strong>💡 操作のコツ</strong>
+          <ul style="margin:6px 0;line-height:1.6;">
+            <li><strong>連続した日付を選択</strong>：PCではドラッグ操作が便利です（例：5月3日〜5月7日まで一度に選択）</li>
+            <li><strong>カーソルオン</strong>：セルにマウスを置くと、該当の氏名と日付がハイライト表示されます</li>
+            <li><strong>横スクロール</strong>：カレンダー部分を横スクロールすると、全ての日付を確認できます</li>
+            <li><strong>縦スクロール</strong>：縦スクロールしても、ボタンと日付行は画面上部に固定表示されます</li>
+          </ul>
+        </div>
+
+        <div class="manual-alert manual-alert-success">
+          <strong>💡 長期休暇カレンダーの便利な機能</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>✅ <strong>自動保存</strong>：選択した日は保存ボタンを押すと即座に反映され、データベースに保存されます</li>
+            <li>✅ <strong>自動適用</strong>：ログイン時や画面更新（F5）時、保存された休暇が自動的に在席確認表に適用されます</li>
+            <li>✅ <strong>カーソルオン強調</strong>：セルにマウスを置くと、該当の氏名と日付列がハイライト表示されます</li>
+            <li>✅ <strong>横スクロール固定</strong>：横スクロールしてもグループ名・氏名は左側に固定表示されます</li>
+            <li>✅ <strong>縦スクロール固定</strong>：縦スクロールしてもボタンエリアと日付行は上部に固定表示されます</li>
+            <li>✅ <strong>レスポンシブ対応</strong>：スマートフォンやタブレットでも使いやすい表示に自動調整されます</li>
+          </ul>
+        </div>
+
+        <p style="margin-top:12px;"><strong>スマートフォン・タブレットでの操作</strong></p>
+        <ul style="line-height:1.8;">
+          <li>セルを<strong>タップ</strong>してON/OFF切り替え（ドラッグ操作は非対応）</li>
+          <li><strong>横スクロール</strong>で全ての日付を確認可能（グループ名・氏名は固定）</li>
+          <li><strong>縦スクロール</strong>で全てのメンバーを確認可能（ボタン・日付は上部固定）</li>
+          <li><strong>日付表示</strong>：画面幅に応じて自動調整されます
+            <ul style="margin:4px 0 0 20px;">
+              <li>PC/タブレット：「12月 9日 月」（横並び表示）</li>
+              <li>スマホ横：「12月 / 9日 / 月」（縦3行表示）</li>
+              <li>スマホ縦：「12月 / 9日 / 月」（より小さいフォントでコンパクト表示）</li>
+            </ul>
+          </li>
+          <li><strong>タップ領域</strong>：狭い画面でもタップしやすいようセルサイズが最適化されています</li>
+        </ul>
+
+        <p style="margin-top:12px;"><strong>注意事項</strong></p>
+        <ul style="line-height:1.8;">
+          <li>⚠️ 長期休暇ボタンが表示されない場合は、管理者が長期休暇を「表示する」設定にしていません</li>
+          <li>⚠️ 備考欄に既に内容がある場合、長期休暇タイトルで上書きされます（既存の内容は消えます）</li>
+          <li>⚠️ 長期休暇カレンダーでの選択を変更した場合は、<strong>必ず「保存」ボタンをクリック</strong>してください</li>
+          <li>⚠️ 保存した休暇日は、イベント選択を解除するまでステータスが固定されます（手動変更できません）</li>
+          <li>⚠️ 複数のイベントがある場合、<strong>1つのイベントしか選択できません</strong>（他のイベントを選択すると上書きされます）</li>
+        </ul>
+
+        <h5>❓ よくある質問（長期休暇機能）</h5>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇（イベント）ボタンが表示されません</summary>
+          <p style="margin:8px 0 8px 20px;">A. 管理者が「表示する」にチェックを入れた長期休暇がある場合のみ表示されます。ボタンが表示されない場合は、管理者に確認してください。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇（イベント）を新規作成したい</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            長期休暇の登録・編集・削除は<strong>管理者のみ</strong>が行えます。夏季休暇、年末年始、GWなどのイベントを設定したい場合は、管理者に問い合わせてください。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇で選択した日を変更したい</summary>
+          <p style="margin:8px 0 8px 20px;">A. 長期休暇ボタンをクリックしてカレンダーを開き、選択を変更して「保存」ボタンをクリックしてください。変更はすぐに在席確認表に反映されます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇カレンダーで自分の名前が見つからない</summary>
+          <p style="margin:8px 0 8px 20px;">A. 横スクロールまたは縦スクロールで探してください。グループ名と氏名は固定表示されているため、スクロールしても常に見えます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇の選択を解除したい（通常のステータスに戻したい）</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            長期休暇カレンダーを開き、青色になっているセルをクリックして解除し、「保存」ボタンをクリックしてください。または、長期休暇カレンダー上部の「表示クリア」ボタンをクリックすると、全ての選択が解除されます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 長期休暇を保存したのに反映されない</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            ブラウザの画面を更新（F5キー）してください。保存された休暇は自動的に適用されるはずですが、反映されない場合は再度長期休暇カレンダーを開いて「表示」ボタンをクリックしてください。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 複数のイベントを同時に選択できますか？</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            いいえ、<strong>1つのイベントしか選択できません</strong>。別のイベントを選択すると、前のイベントで選択した内容は上書きされます。複数のイベント期間にまたがる休暇を取る場合は、それぞれのイベントで個別に選択してください。
+          </p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 日付が縦に表示されて読みにくい</summary>
+          <p style="margin:8px 0 8px 20px;">A. スマートフォンなど狭い画面では、日付が縦3行表示（「12月 / 9日 /
+            月」）になります。これは限られたスペースに多くの情報を表示するための仕様です。PCやタブレットでは横並び表示になります。</p>
+        </details>
+
+        <p style="margin-top:16px;font-size:0.95em;">
+          <strong>📚 さらに詳しく知りたい方へ</strong><br>
+          より詳細な情報は <a href="USER_MANUAL.md" target="_blank"
+            style="color:#0073bb;text-decoration:underline;">詳細マニュアル（USER_MANUAL.md）</a> をご覧ください。
+        </p>
+      </section>
+
+      <section id="manualAdmin" class="manual-section manual-tab-content">
+        <h4>⚙️ 管理者マニュアル</h4>
+
+        <div class="manual-alert manual-alert-warning">
+          <strong>🔐 管理者ログインについて</strong><br>
+          管理パネルを表示するには、<strong>管理者パスワード</strong>でログインしてください。<br>
+          一般ユーザーパスワードではログインできても「管理」ボタンは表示されません。
+        </div>
+
+        <h5>📂 1. CSVエクスポート - データのバックアップ</h5>
+        <p><strong>用途</strong>：現在の名簿と在席データをExcelで編集できる形式でダウンロードします</p>
+        <ol style="line-height:1.8;">
+          <li>画面上部の「管理」ボタンをクリック</li>
+          <li>管理パネルが開きます</li>
+          <li>「CSVエクスポート」セクションの「ダウンロード」ボタンをクリック</li>
+          <li>✅ ファイル <code>presence_<拠点ID>.csv</code> がダウンロードされます</li>
+        </ol>
+        <p class="u-mt-8 u-text-red u-bold">⚠️ 重要：CSVインポート前に必ずエクスポートでバックアップを取ってください！</p>
+
+        <h5>📥 2. CSVインポート - 名簿の一括登録・更新</h5>
+        <p><strong>用途</strong>：Excelで編集した名簿を一括で取り込みます（名簿全体が置き換わります）</p>
+
+        <p style="margin:12px 0 8px 0;"><strong>対応しているCSV形式</strong></p>
+        <ul style="line-height:1.8;">
+          <li>
+            <strong>最新形式（推奨）</strong>：<code>1行目: 在席管理CSV / 2行目: グループ番号,グループ名,表示順,id,氏名,内線,携帯番号,Email,業務時間,ステータス,戻り時間,備考</code>
+          </li>
+          <li><strong>標準形式</strong>：<code>グループ番号,グループ名,表示順,id,氏名,内線,業務時間,ステータス,戻り時間,備考</code>（携帯番号・Email列なし、タイトル行なし）
+          </li>
+          <li><strong>旧形式</strong>：<code>グループ番号,グループ名,表示順,id,氏名,内線,ステータス,戻り時間,備考</code>（業務時間列なし。既存データから引き継ぎます）</li>
+        </ul>
+
+        <p style="margin:12px 0 8px 0;"><strong>操作手順</strong></p>
+        <ol style="line-height:1.8;">
+          <li><strong class="u-text-red">【重要】まずエクスポートでバックアップを取る</strong></li>
+          <li>ダウンロードしたCSVファイルをExcelで開いて編集</li>
+          <li>管理パネルの「CSVインポート」セクションで「ファイルを選択」をクリック</li>
+          <li>編集したCSVファイルを選択</li>
+          <li>「取り込み」ボタンをクリック</li>
+          <li>✅「インポート完了」と表示されたら成功です</li>
+        </ol>
+
+        <div class="manual-alert manual-alert-danger">
+          <strong>⚠️ 注意事項</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>インポートすると<strong>名簿全体が置き換わります</strong>（部分更新はできません）</li>
+            <li>CSVに含まれないメンバーは削除されます</li>
+            <li>元に戻すにはバックアップのCSVを再インポートしてください</li>
+            <li>最新形式では1行目がタイトル行、2行目がヘッダー行です（標準・旧形式は1行目がヘッダー行）</li>
+          </ul>
+        </div>
+
+        <h5>🏢 3. 拠点名の変更</h5>
+        <ol style="line-height:1.8;">
+          <li>管理パネルの「拠点名の変更」セクションに新しい拠点名を入力</li>
+          <li>「変更」ボタンをクリック</li>
+          <li>✅ 画面タイトルとログイン画面の拠点名が変更されます</li>
+        </ol>
+
+        <h5>🔑 4. パスワード変更</h5>
+        <p>2種類のパスワードを個別に変更できます：</p>
+        <ul style="line-height:1.8;">
+          <li><strong>新パスワード</strong>：一般ユーザーがログインするときのパスワード</li>
+          <li><strong>新管理者PW</strong>：管理者権限でログインするときのパスワード</li>
+        </ul>
+        <ol style="line-height:1.8;">
+          <li>変更したいパスワード欄に新しいパスワードを入力（両方でも片方でもOK）</li>
+          <li>「更新」ボタンをクリック</li>
+          <li>✅「パスワードを更新しました」と表示されたら成功です</li>
+        </ol>
+        <p style="margin:8px 0;color:#666;font-size:0.9em;">
+          💡 パスワードは平文で保存されます。<strong>強固なパスワード</strong>を使用してください。
+        </p>
+
+        <h5>📢 5. お知らせ管理</h5>
+        <p><strong>用途</strong>：拠点のメンバー全員に重要な情報を掲示します</p>
+
+        <div class="manual-alert manual-alert-success">
+          <strong>✨ 自動読み込み機能</strong><br>
+          管理パネルを開くと、現在のお知らせが<strong>自動的に表示</strong>されます。<br>
+          「現在のお知らせを読み込み」ボタンを押す必要はありません。
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>お知らせの追加</strong></p>
+        <ol style="line-height:1.8;">
+          <li>管理パネルを開く（現在のお知らせが自動表示されます）</li>
+          <li>「➕ お知らせを追加」ボタンをクリック → 入力欄が追加されます</li>
+          <li><strong>タイトル</strong>（最大200文字）と<strong>内容</strong>（最大2000文字）を入力</li>
+          <li>「保存」ボタンをクリック</li>
+          <li>✅ お知らせが即座に保存され、約30秒以内に全ユーザーの画面に表示されます</li>
+        </ol>
+
+        <p style="margin:12px 0 8px 0;"><strong>お知らせの編集</strong></p>
+        <ol style="line-height:1.8;">
+          <li>編集したいお知らせの「編集」ボタンをクリック</li>
+          <li>入力欄に内容が表示されるので、修正します</li>
+          <li>「保存」ボタンをクリック</li>
+        </ol>
+
+        <p style="margin:12px 0 8px 0;"><strong>お知らせの削除</strong></p>
+        <ol style="line-height:1.8;">
+          <li>削除したいお知らせの「削除」ボタンをクリック</li>
+          <li>確認ダイアログで「OK」をクリック</li>
+        </ol>
+
+        <div class="manual-alert manual-alert-teal">
+          <strong>💡 お知らせ機能のポイント</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>お知らせは<strong>拠点ごと</strong>に独立して管理されます</li>
+            <li>1拠点あたり<strong>最大20件</strong>まで登録できます</li>
+            <li>お知らせは<strong>追加した順</strong>（古い順）に表示されます</li>
+            <li>HTML/スクリプトは自動的に無効化されます（セキュリティ対策）</li>
+            <li>全ユーザーの画面に<strong>約30秒以内</strong>に自動反映されます</li>
+          </ul>
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>お知らせの用途例</strong></p>
+        <ul style="line-height:1.8;">
+          <li>🔧 システムメンテナンスの予定</li>
+          <li>📅 全体会議やイベントの案内</li>
+          <li>⚠️ 業務上の注意事項</li>
+          <li>🎉 新機能の案内</li>
+          <li>📢 重要な連絡事項</li>
+        </ul>
+
+        <h5>📅 5. イベント管理</h5>
+        <p><strong>用途</strong>：GW、年末年始、夏季休暇など、複数日にわたる休暇を事前に登録・管理します</p>
+
+        <div class="manual-alert manual-alert-success">
+          <strong>✨ イベント機能の特長</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>ガントチャート形式で休暇期間とメンバーを視覚的に管理できます</li>
+            <li>対象メンバーの在席状況が自動的にハイライト表示されます</li>
+            <li>ユーザーは登録されたイベントを選択して表示できます</li>
+            <li>表示/非表示の切り替えで、公開するイベントをコントロールできます</li>
+          </ul>
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>イベントの作成</strong></p>
+        <ol style="line-height:1.8;">
+          <li>管理パネルを開き、<strong>「📅 イベント管理」</strong>タブをクリック</li>
+          <li><strong>対象拠点</strong>を選択（スーパー管理者の場合）</li>
+          <li><strong>タイトル</strong>を入力（例：「GW期間休暇」「年末年始休暇」）</li>
+          <li><strong>開始日</strong>と<strong>終了日</strong>を入力（カレンダーから選択可能）</li>
+          <li><strong>備考</strong>（任意）を入力（社内共有用のメモなど）</li>
+          <li><strong>「表示する」</strong>チェックボックスをONにすると、ユーザーがイベントボタンから選択できるようになります</li>
+          <li>ガントチャート（日付×メンバーの表）で、休暇対象のメンバーと日付のセルをクリック/ドラッグしてONにします</li>
+          <li><strong>「💾 作成/更新」</strong>ボタンをクリック</li>
+          <li>✅「イベントを保存しました」と表示されたら成功です</li>
+        </ol>
+
+        <p style="margin:12px 0 8px 0;"><strong>イベントの編集</strong></p>
+        <ol style="line-height:1.8;">
+          <li>管理パネルの「登録済みのイベント」一覧から、編集したい項目の<strong>「編集」</strong>ボタンをクリック</li>
+          <li>入力欄に現在の設定が表示されます</li>
+          <li>必要な項目を修正します</li>
+          <li><strong>「💾 作成/更新」</strong>ボタンをクリック</li>
+        </ol>
+
+        <p style="margin:12px 0 8px 0;"><strong>イベントの削除</strong></p>
+        <ol style="line-height:1.8;">
+          <li>編集したいイベントを選択（編集ボタンをクリック）</li>
+          <li><strong>「🗑️ 削除」</strong>ボタンをクリック</li>
+          <li>確認ダイアログで「OK」をクリック</li>
+        </ol>
+
+        <p style="margin:12px 0 8px 0;"><strong>ガントチャートの操作方法</strong></p>
+        <ul style="line-height:1.8;">
+          <li><strong>セルをクリック</strong>：休暇のON/OFFを切り替え</li>
+          <li><strong>ドラッグ</strong>：連続した日付やメンバーを一度に設定</li>
+          <li><strong>スマートフォン</strong>：タップで操作可能</li>
+          <li><strong>グループジャンプ</strong>：メンバーが多い場合、グループ選択で素早く移動できます</li>
+          <li><strong>色分け</strong>：土日・祝日は自動的に色付けされます</li>
+        </ul>
+
+        <p style="margin:12px 0 8px 0;"><strong>イベントの並び替え</strong></p>
+        <p>「登録済みのイベント」一覧では、複数のイベントの表示順序を変更できます。</p>
+        <ol style="line-height:1.8;">
+          <li>一覧の「並び」列にある<strong>「↑」「↓」ボタン</strong>をクリックすると、イベントの順序が入れ替わります</li>
+          <li>上にあるイベントほど優先度が高く、ユーザーが選択する際のリストの上位に表示されます</li>
+          <li>並び替え後、<strong>自動的に保存</strong>されます（保存ボタンを押す必要はありません）</li>
+        </ol>
+        <div class="manual-hint">
+          <strong>💡 ヒント</strong>：現在進行中のイベント（例：GW、年末年始）を上位に配置すると、ユーザーが選択しやすくなります。
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>休暇種別（休暇固定）の設定</strong></p>
+        <p>各イベントに対して、ステータスとして表示される「休暇種別」を設定できます。</p>
+        <ul style="line-height:1.8;">
+          <li><strong>設定場所</strong>：「登録済みのイベント」一覧の<strong>「休暇固定（種別）」</strong>列</li>
+          <li><strong>操作方法</strong>：該当の列をクリックすると、ドロップダウンから種別を選択できます</li>
+          <li><strong>選択肢</strong>：「休み」「休暇」「特休」「有給」「代休」などから選択可能</li>
+          <li><strong>自動保存</strong>：選択すると即座に保存され、ユーザーの画面に反映されます</li>
+        </ul>
+        <div class="manual-alert manual-alert-success">
+          <strong>使用例</strong>
+          <ul style="margin:4px 0;line-height:1.6;">
+            <li>「GW期間休暇」→ 種別：<strong>「休暇」</strong>（通常の長期休暇）</li>
+            <li>「年末年始休暇」→ 種別：<strong>「休み」</strong>（会社休業日）</li>
+            <li>「夏季休暇」→ 種別：<strong>「有給」</strong>（有給休暇推奨期間）</li>
+            <li>「創立記念日」→ 種別：<strong>「特休」</strong>（特別休暇）</li>
+          </ul>
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>色/カテゴリーの設定</strong></p>
+        <p>イベントに色を設定することで、視覚的に区別しやすくなります。</p>
+        <ul style="line-height:1.8;">
+          <li><strong>設定場所</strong>：イベント作成/更新フォームの「色/カテゴリー」ドロップダウン</li>
+          <li><strong>選択肢</strong>：
+            <ul style="margin:4px 0 4px 20px;">
+              <li>🟡 <strong>サニー（amber）</strong>：明るい黄色系（夏季休暇など）</li>
+              <li>🔵 <strong>ブルー（blue）</strong>：青系（通常の休暇）</li>
+              <li>🟢 <strong>グリーン（green）</strong>：緑系（有給推奨期間など）</li>
+              <li>🩷 <strong>ピンク（pink）</strong>：ピンク系（特別イベント）</li>
+              <li>🟣 <strong>パープル（purple）</strong>：紫系（記念日など）</li>
+              <li>🟦 <strong>ティール（teal）</strong>：青緑系（研修期間など）</li>
+              <li>⚫ <strong>グレー（gray）</strong>：灰色系（非アクティブなイベント）</li>
+            </ul>
+          </li>
+          <li><strong>効果</strong>：一覧表示やカレンダー表示時に、設定した色でイベントが識別されます</li>
+        </ul>
+
+        <p style="margin:12px 0 8px 0;"><strong>管理者によるユーザー休暇日の編集</strong></p>
+        <p>管理者は、イベント作成時のガントチャートで全ユーザーの休暇日を一括設定できます。</p>
+        <ol style="line-height:1.8;">
+          <li>イベント作成/更新フォームで<strong>開始日と終了日</strong>を入力すると、ガントチャートが表示されます</li>
+          <li>ガントチャート上で、<strong>各メンバーの休暇日をクリック/ドラッグ</strong>してON（青色）に設定します</li>
+          <li>複数のメンバーを一度に設定する場合は、<strong>ドラッグ操作</strong>が便利です</li>
+          <li>設定後、<strong>「💾 作成/更新」</strong>ボタンをクリックすると保存されます</li>
+          <li>✅ ユーザーがそのイベントを選択すると、設定した日が自動的に「休み」ステータスになります</li>
+        </ol>
+        <div class="manual-alert manual-alert-danger">
+          <strong>⚠️ 重要</strong>：イベントカレンダーでユーザー自身が変更した休暇日は、<strong>ユーザー個人のデータ</strong>として保存されます。<br>
+          管理者が後からガントチャートを編集しても、既にユーザーが保存した個人設定は上書きされません。
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>表示/非表示の切り替え</strong></p>
+        <ul style="line-height:1.8;">
+          <li>「登録済みのイベント」一覧の<strong>「表示」チェックボックス</strong>で切り替えられます</li>
+          <li>チェックON：ユーザーがイベントボタンから選択できます</li>
+          <li>チェックOFF：管理者のみ閲覧可能（ユーザーには表示されません）</li>
+          <li>複数のイベントを同時に「表示」にできますが、ユーザーが選択できるのは1つだけです</li>
+        </ul>
+
+        <div class="manual-alert manual-alert-teal">
+          <strong>💡 イベント機能のポイント</strong>
+          <ul style="margin:8px 0;line-height:1.8;">
+            <li>イベントは<strong>拠点ごと</strong>に独立して管理されます</li>
+            <li>ユーザーがイベントを選択すると、該当メンバーの行が<strong>ハイライト表示</strong>されます</li>
+            <li>ステータス欄にイベントのタイトルが表示され、内部的には「休み」として扱われます</li>
+            <li>イベント表示を解除するまで、該当メンバーのステータスは編集できません</li>
+            <li>休暇期間が終了しても自動的には解除されません（手動で非表示にしてください）</li>
+          </ul>
+        </div>
+
+        <p style="margin:12px 0 8px 0;"><strong>イベントの用途例</strong></p>
+        <ul style="line-height:1.8;">
+          <li>🎌 <strong>GW（ゴールデンウィーク）</strong>：5月の連休期間</li>
+          <li>🎆 <strong>夏季休暇</strong>：8月のお盆休み期間</li>
+          <li>🎄 <strong>年末年始休暇</strong>：12月末〜1月初旬</li>
+          <li>🏢 <strong>会社全体休業日</strong>：創立記念日など</li>
+          <li>📅 <strong>特定チームの一斉休暇</strong>：部署単位の休暇計画</li>
+        </ul>
+
+        <h5>📋 運用上の注意事項</h5>
+        <ul style="line-height:1.8;">
+          <li>💾 <strong>バックアップは必須</strong>：重要な操作の前に必ずCSVエクスポートでバックアップを取ってください</li>
+          <li>👥 <strong>複数管理者の同時操作は避ける</strong>：競合してデータが失われる可能性があります</li>
+          <li>🔄 <strong>定期バックアップ</strong>：週1回程度、定期的にCSVエクスポートすることを推奨します</li>
+          <li>🔒 <strong>パスワード管理</strong>：パスワードは平文保存のため、強固なものを使い、関係者以外に漏らさないでください</li>
+        </ul>
+
+        <h5>❓ よくある質問（管理者向け）</h5>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. CSVインポートで「CSVヘッダが不正です」と出る</summary>
+          <p style="margin:8px 0 8px 20px;">A. ヘッダー行（最新形式では2行目）が正しい形式か確認してください。エクスポートしたCSVのヘッダー行をそのまま使うのが確実です。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 誤ってメンバーを削除してしまった</summary>
+          <p style="margin:8px 0 8px 20px;">A. 削除前のバックアップCSVを再インポートしてください。バックアップがない場合は手動でCSVを作成する必要があります。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. メニュー設定のJSONが正しいか不安</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            オンラインのJSONバリデーター（例：jsonlint.com）で確認できます。保存時にエラーが出た場合は「現在の設定を読み込み」で元に戻してください。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントのガントチャートが表示されません</summary>
+          <p style="margin:8px 0 8px 20px;">A. 開始日と終了日を入力してから、ガントチャートが生成されます。日付を入力していることを確認してください。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントを保存したのにユーザーに表示されない</summary>
+          <p style="margin:8px 0 8px 20px;">A. 「表示する」チェックボックスがONになっているか確認してください。チェックOFFの場合、管理者のみ閲覧可能でユーザーには表示されません。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントの表示をやめたい</summary>
+          <p style="margin:8px 0 8px 20px;">A. イベント管理で該当する休暇の「表示」チェックボックスをOFFにしてください。または、休暇を削除することもできます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントの並び順を変更したい</summary>
+          <p style="margin:8px 0 8px 20px;">A. 「登録済みのイベント」一覧の「並び」列にある↑↓ボタンをクリックすると順序を変更できます。変更は自動保存されます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 休暇種別（休暇固定）を変更したい</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            「登録済みのイベント」一覧の「休暇固定（種別）」列をクリックすると、ドロップダウンから種別（休み、休暇、特休、有給、代休など）を選択できます。選択すると即座に保存されます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントの色を変更したい</summary>
+          <p style="margin:8px 0 8px 20px;">A. イベント編集画面の「色/カテゴリー」ドロップダウンから、サニー、ブルー、グリーン、ピンク、パープル、ティール、グレーの中から選択できます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. 複数のイベントを同時に表示できますか？</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            管理者は複数のイベントを「表示する」に設定できますが、ユーザーが実際に選択できるのは1つだけです。ユーザーはイベントボタンから選択して切り替えることができます。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. ユーザーが個別に変更した休暇日を管理者が確認できますか？</summary>
+          <p style="margin:8px 0 8px 20px;">A.
+            ユーザーが長期休暇カレンダーで変更した内容は、そのユーザーの「メンバーの休暇指定ビット（membersBits）」として保存されています。管理者はCSVエクスポートで確認できますが、直接編集する機能は現在ありません。各ユーザーが自分で長期休暇カレンダーから変更してください。
+          </p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. ガントチャートで設定した休暇日が反映されない</summary>
+          <p style="margin:8px 0 8px 20px;">A. ガントチャートでセルをクリック/ドラッグした後、必ず「💾
+            作成/更新」ボタンをクリックして保存してください。また、ユーザー側で該当イベントを選択していない場合は、休暇日として反映されません。</p>
+        </details>
+        <details style="margin:8px 0;">
+          <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">Q. イベントの対象拠点を変更したい</summary>
+          <p style="margin:8px 0 8px 20px;">A. イベント編集画面の「対象拠点」ドロップダウンから変更できます（スーパー管理者のみ）。変更後「💾 作成/更新」ボタンで保存してください。</p>
+        </details>
+
+        <p style="margin-top:16px;font-size:0.95em;">
+          <strong>📚 さらに詳しく知りたい方へ</strong><br>
+          より詳細な情報は <a href="ADMIN_MANUAL.md" target="_blank"
+            style="color:#0073bb;text-decoration:underline;">管理者向け詳細マニュアル（ADMIN_MANUAL.md）</a> をご覧ください。
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ログイン -->
+  <div id="login" class="login u-hidden">
+    <form class="card" onsubmit="event.preventDefault();">
+      <h2>在席確認表</h2>
+      <p>拠点を選び、パスワードを入力してください</p>
+      <input type="text" name="username" id="dummyUsername" tabindex="-1" aria-hidden="true" class="u-visually-hidden"
+        autocomplete="username">
+      <select id="officeSel" aria-label="拠点"
+        onchange="document.getElementById('dummyUsername').value = this.options[this.selectedIndex].text"></select>
+      <input type="password" id="pw" placeholder="Password" autocomplete="current-password" />
+      <button id="btnLogin" type="button">ログイン</button>
+      <div id="loginMsg" class="login-msg" aria-live="polite"></div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- お知らせエリア -->
+  <div id="noticesArea" class="notices-area u-hidden">
+    <div class="notices-container">
+      <div class="notices-header">
+        <h3 class="notices-title">📢 お知らせ<span class="notices-hint">（タイトル行や📢ボタンをクリックすると折りたためます）</span></h3>
+        <span id="noticesSummary" class="notices-summary u-hidden"></span>
+      </div>
+      <div id="noticesList" class="notices-list"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="board" class="board u-hidden"></div>
+  </div>
+  <div id="diag" class="diag"></div>
+  <script src="js/config.js"></script>
+  　
+  <script src="js/globals.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/filters.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/vacations.js"></script>
+  <script src="js/offices.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/tools.js"></script>
+  <script src="js/notices.js"></script>
+  <script src="main.js"></script>
+
+</body>
+
+</html>

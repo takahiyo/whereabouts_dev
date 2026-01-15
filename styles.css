@@ -30,10 +30,69 @@
     --status-effective: var(--status-fixed, var(--w-status));
 
     --gap: 20px;
-    --line: #d9d9d9;
-    --head: #f1ece6;
-    --bg: #fafafa;
     --header-height: 56px;
+
+    /* === Color System (Single Source of Truth) === */
+    /* Base Colors */
+    --white: #fff;
+    --black: #000;
+    --bg-main: #fafafa;
+    --bg-header: #fff;
+    --bg-head: #f1ece6;
+    --line: #d9d9d9;
+
+    /* Text Colors */
+    --text-primary: #1f2937;
+    --text-secondary: #374151;
+    --text-muted: #6b7280;
+    --text-danger: #ef4444;
+
+    /* Status Colors (Bg / Accent) */
+    --st-out-bg: #fff7ed;
+    --st-out-acc: #f59e0b;
+    --st-meet-bg: #eff6ff;
+    --st-meet-acc: #3b82f6;
+    --st-remote-bg: #f5f3ff;
+    --st-remote-acc: #8b5cf6;
+    --st-trip-bg: #ecfdf5;
+    --st-trip-acc: #10b981;
+    --st-train-bg: #fefce8;
+    --st-train-acc: #eab308;
+    --st-health-bg: #f0f9ff;
+    --st-health-acc: #06b6d4;
+    --st-coadoc-bg: #fdf2f8;
+    --st-coadoc-acc: #db2777;
+    --st-home-bg: #f3f4f6;
+    --st-home-acc: #6b7280;
+    --st-off-bg: #fef2f2;
+    --st-off-acc: #ef4444;
+
+    /* Button Colors */
+    --btn-title-bg: #dff1ff;
+    --btn-title-bd: #bfe4ff;
+    --btn-notice-bg: #fffbeb;
+    --btn-notice-bd: #fbbf24;
+    --btn-admin-bg: #e7f8e7;
+    --btn-admin-bd: #b7e6b7;
+    --btn-event-bg: #fdf2f8;
+    --btn-event-bd: #fbcfe8;
+    --btn-logout-bg: #fee2e2;
+    --btn-logout-bd: #fecaca;
+    --btn-tools-bg: #e0f2fe;
+    --btn-tools-bd: #bae6fd;
+    --btn-manual-bg: #eef2ff;
+    --btn-manual-bd: #c7d2fe;
+
+    /* Interactive */
+    --focus-ring: #4a90e2;
+    --link-blue: #2563eb;
+    --hover-bg: #f3f4f6;
+
+    /* Toast */
+    --toast-bg: #0f172a;
+    --toast-text: #e2e8f0;
+    --toast-error-bg: #7f1d1d;
+    --toast-error-text: #fee2e2;
   }
 
   body {
@@ -54,7 +113,7 @@
     justify-content: center;
     margin-bottom: 12px;
     flex-wrap: wrap;
-    background: #fff;
+    background: var(--bg-header);
     padding: 6px 0;
     box-shadow: 0 1px 0 rgba(0, 0, 0, .06);
   }
@@ -72,7 +131,7 @@
   header .tools-btn {
     font-size: 14px;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-primary);
     padding: .35rem .9rem;
     border-radius: 999px;
     line-height: 1.2;
@@ -81,43 +140,43 @@
   }
 
   header .title-btn {
-    background: #dff1ff;
-    border-color: #bfe4ff;
+    background: var(--btn-title-bg);
+    border-color: var(--btn-title-bd);
   }
 
   header .notices-btn {
-    background: #fffbeb;
-    border-color: #fbbf24;
+    background: var(--btn-notice-bg);
+    border-color: var(--btn-notice-bd);
     display: none;
   }
 
   header .admin-btn {
-    background: #e7f8e7;
-    border-color: #b7e6b7;
+    background: var(--btn-admin-bg);
+    border-color: var(--btn-admin-bd);
     display: none;
   }
 
   header .event-btn {
-    background: #fdf2f8;
-    border-color: #fbcfe8;
+    background: var(--btn-event-bg);
+    border-color: var(--btn-event-bd);
     display: none;
   }
 
   header .logout-btn {
-    background: #fee2e2;
-    border-color: #fecaca;
+    background: var(--btn-logout-bg);
+    border-color: var(--btn-logout-bd);
     display: none;
   }
 
   header .tools-btn {
-    background: #e0f2fe;
-    border-color: #bae6fd;
+    background: var(--btn-tools-bg);
+    border-color: var(--btn-tools-bd);
     display: none;
   }
 
   header .manual-btn {
-    background: #eef2ff;
-    border-color: #c7d2fe;
+    background: var(--btn-manual-bg);
+    border-color: var(--btn-manual-bd);
     display: none;
   }
 
@@ -197,7 +256,7 @@
   thead th {
     position: sticky;
     top: 0;
-    background: #f2efe9;
+    background: var(--bg-head);
     font-weight: 700
   }
 
@@ -244,7 +303,7 @@
     padding: .3rem .35rem;
     border: 1px solid var(--line);
     border-radius: 4px;
-    background: #fff;
+    background: var(--white);
     font-size: 14px;
     appearance: auto;
     -webkit-appearance: auto
@@ -393,21 +452,22 @@
     align-items: center;
     gap: 12px;
     padding: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--e5e7eb);
+    /* Note: Creating var for this as it is used often or use var(--line) */
     border-radius: 12px;
-    background: #f9fafb;
+    background: var(--bg-main);
   }
 
   .contact-label {
     font-weight: 700;
-    color: #374151;
+    color: var(--text-secondary);
     min-width: 56px;
   }
 
   .contact-link {
     flex: 1;
     text-align: right;
-    color: #2563eb;
+    color: var(--link-blue);
     font-weight: 700;
     word-break: break-word;
     line-break: anywhere;
@@ -419,13 +479,13 @@
     justify-content: flex-end;
     padding: 6px 10px;
     border-radius: 10px;
-    background: #e0edff;
+    background: var(--btn-tools-bg);
   }
 
   .contact-link:hover,
   .contact-link:focus-visible {
     text-decoration: underline;
-    outline: 2px solid #2563eb;
+    outline: 2px solid var(--link-blue);
     outline-offset: 2px;
   }
 
@@ -448,11 +508,11 @@
     height: 38px;
     border-radius: 999px;
     border: 1px solid #d1d5db;
-    background: #fff;
+    background: var(--white);
     cursor: pointer;
     font-size: 14px;
     font-weight: 700;
-    color: #374151;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -460,11 +520,11 @@
   }
 
   .contact-close:hover {
-    background: #f3f4f6;
+    background: var(--hover-bg);
   }
 
   .contact-close:focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid var(--link-blue);
     outline-offset: 2px;
   }
 
@@ -478,54 +538,54 @@
   }
 
   #board tbody tr.st-out {
-    background: #fff7ed;
-    box-shadow: inset 4px 0 0 #f59e0b;
+    background: var(--st-out-bg);
+    box-shadow: inset 4px 0 0 var(--st-out-acc);
   }
 
   #board tbody tr.st-meeting {
-    background: #eff6ff;
-    box-shadow: inset 4px 0 0 #3b82f6;
+    background: var(--st-meet-bg);
+    box-shadow: inset 4px 0 0 var(--st-meet-acc);
   }
 
   #board tbody tr.st-remote {
-    background: #f5f3ff;
-    box-shadow: inset 4px 0 0 #8b5cf6;
+    background: var(--st-remote-bg);
+    box-shadow: inset 4px 0 0 var(--st-remote-acc);
   }
 
   #board tbody tr.st-trip {
-    background: #ecfdf5;
-    box-shadow: inset 4px 0 0 #10b981;
+    background: var(--st-trip-bg);
+    box-shadow: inset 4px 0 0 var(--st-trip-acc);
   }
 
   #board tbody tr.st-training {
-    background: #fefce8;
-    box-shadow: inset 4px 0 0 #eab308;
+    background: var(--st-train-bg);
+    box-shadow: inset 4px 0 0 var(--st-train-acc);
   }
 
   #board tbody tr.st-health {
-    background: #f0f9ff;
-    box-shadow: inset 4px 0 0 #06b6d4;
+    background: var(--st-health-bg);
+    box-shadow: inset 4px 0 0 var(--st-health-acc);
   }
 
   #board tbody tr.st-coadoc {
-    background: #fdf2f8;
-    box-shadow: inset 4px 0 0 #db2777;
+    background: var(--st-coadoc-bg);
+    box-shadow: inset 4px 0 0 var(--st-coadoc-acc);
   }
 
   #board tbody tr.st-home {
-    background: #f3f4f6;
-    box-shadow: inset 4px 0 0 #6b7280;
+    background: var(--st-home-bg);
+    box-shadow: inset 4px 0 0 var(--st-home-acc);
   }
 
   #board tbody tr.st-off {
-    background: #fef2f2;
-    box-shadow: inset 4px 0 0 #ef4444;
-    color: #374151;
+    background: var(--st-off-bg);
+    box-shadow: inset 4px 0 0 var(--st-off-acc);
+    color: var(--text-secondary);
   }
 
   #board tbody tr.st-off input,
   #board tbody tr.st-off select {
-    color: #374151;
+    color: var(--text-secondary);
   }
 
   /* 戻り時間入力の促し（外出/会議） */
@@ -551,6 +611,7 @@
     transform: translateY(-50%);
     font-size: 12px;
     color: #b91c1c;
+    /* Keep as specific dark red or map to danger/muted */
     pointer-events: none;
     user-select: none;
   }
@@ -572,7 +633,7 @@
   .login {
     position: fixed;
     inset: 0;
-    background: #fff;
+    background: var(--bg-header);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -580,7 +641,7 @@
   }
 
   .login .card {
-    background: #fff;
+    background: var(--bg-header);
     border-radius: 8px;
     padding: 20px;
     min-width: 300px;
@@ -611,8 +672,8 @@
   .toast-panel {
     width: min(960px, calc(100% - 32px));
     max-width: 960px;
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--toast-bg);
+    color: var(--toast-text);
     border-radius: 10px;
     padding: 16px 18px;
     font-size: 16px;
@@ -627,14 +688,14 @@
   }
 
   .toast.toast--error .toast-panel {
-    background: #7f1d1d;
-    color: #fee2e2;
+    background: var(--toast-error-bg);
+    color: var(--toast-error-text);
     border-color: rgba(254, 226, 226, 0.35);
   }
 
   .toast.toast--success .toast-panel {
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--toast-bg);
+    color: var(--toast-text);
   }
 
   @media (max-width: 720px) {
